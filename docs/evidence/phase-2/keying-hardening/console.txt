@@ -1,0 +1,7 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [17:21:54]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [17:22:04]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [17:22:11]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [17:22:18]: Babylon.js v9.9.1 - WebGL2
