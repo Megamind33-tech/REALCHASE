@@ -1,0 +1,10 @@
+stream tracks: {"audioTracks":1,"videoTracks":1}
+meter fill width samples (live RMS → %): 94.3442%, 0.0158777%, 0%
+(non-zero / varying width proves real audio analysis, not a static/fake bar)
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [17:38:16]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [17:38:23]: Babylon.js v9.9.1 - WebGL2

@@ -141,7 +141,14 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      let stream: MediaStream;
+      try {
+        // Capture audio too so the mixer can show real levels.
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      } catch {
+        // Device may have no microphone — fall back to video-only rather than fail.
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       dispatch({ type: 'PATCH', id, patch: { status: 'live', stream, error: null } });
       // Convenience: route the first live source to Preview if Preview is empty.
       dispatch({ type: 'SET_PREVIEW', id });

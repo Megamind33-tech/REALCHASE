@@ -1,9 +1,13 @@
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
+import { useSources } from '@/context/SourcesContext';
+import { AudioMeter } from '@/components/audio/AudioMeter';
 import { TRANSITIONS, STREAM_DESTINATIONS } from '@/data/mock/studioData';
 
 export function OutputPanel() {
   const { state } = useShell();
+  const { sources } = useSources();
+  const liveAudioSources = sources.filter((s) => s.status === 'live' && s.stream && s.stream.getAudioTracks().length > 0);
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
   return (
@@ -44,16 +48,23 @@ export function OutputPanel() {
         <div
           data-testid="audio-meter-panel"
           style={{
-            border: '1px dashed var(--border-active)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 3,
-            padding: 12,
-            color: 'var(--text-muted)',
-            fontSize: 10,
-            lineHeight: 1.5,
+            padding: 10,
             marginBottom: 12,
           }}
         >
-          No real audio source connected. Audio engine and source audio analysis are not wired yet, so meters and routing controls are hidden instead of showing fake levels.
+          {liveAudioSources.length === 0 ? (
+            <span style={{ color: 'var(--text-muted)', fontSize: 10, lineHeight: 1.5 }}>
+              No real audio source connected. Add a source with a microphone and live levels appear here (measured from the source audio track — never faked).
+            </span>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {liveAudioSources.map((s) => (
+                <AudioMeter key={s.id} stream={s.stream as MediaStream} label={s.name} />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="section-label" style={{ marginBottom: 6 }}>Output &amp; Stream</div>
