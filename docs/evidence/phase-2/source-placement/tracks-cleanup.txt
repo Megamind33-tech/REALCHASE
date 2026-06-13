@@ -1,5 +1,5 @@
 Camera permission + track lifecycle (proves no leaked MediaStream tracks).
-Captured: 2026-06-13T12:23:43.532Z
+Captured: 2026-06-13T13:03:29.744Z
 
 navigator.permissions camera state: granted
 
@@ -12,6 +12,6 @@ Tracks AFTER source removed (expect readyState "ended"):
 Streams created total: 1 (one Add Webcam = one stream; no duplicates).
 
 --- console / page errors ---
-[log] BJS - [12:23:20]: Babylon.js v9.9.1 - WebGL2
-[log] BJS - [12:23:29]: Babylon.js v9.9.1 - WebGL2
-[log] BJS - [12:23:40]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [13:03:06]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [13:03:15]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [13:03:26]: Babylon.js v9.9.1 - WebGL2
