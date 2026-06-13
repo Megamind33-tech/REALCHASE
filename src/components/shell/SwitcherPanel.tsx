@@ -144,6 +144,11 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
           <KeySlider label="Black clip" value={keying.blackClip} min={0} max={0.5} step={0.01} onChange={(v) => set({ blackClip: v })} />
           <KeySlider label="White clip" value={keying.whiteClip} min={0.5} max={1} step={0.01} onChange={(v) => set({ whiteClip: v })} />
           <KeySlider label="Light wrap" value={keying.lightWrap} min={0} max={1} step={0.01} onChange={(v) => set({ lightWrap: v })} />
+          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Garbage matte (crop)</div>
+          <KeySlider label="Crop left" value={keying.garbageLeft} min={0} max={0.5} step={0.01} onChange={(v) => set({ garbageLeft: v })} />
+          <KeySlider label="Crop right" value={keying.garbageRight} min={0.5} max={1} step={0.01} onChange={(v) => set({ garbageRight: v })} />
+          <KeySlider label="Crop top" value={keying.garbageTop} min={0} max={0.5} step={0.01} onChange={(v) => set({ garbageTop: v })} />
+          <KeySlider label="Crop bottom" value={keying.garbageBottom} min={0.5} max={1} step={0.01} onChange={(v) => set({ garbageBottom: v })} />
         </>
       )}
       <KeySlider label="Opacity" value={keying.opacity} min={0} max={1} step={0.01} onChange={(v) => set({ opacity: v })} />
