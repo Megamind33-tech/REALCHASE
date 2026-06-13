@@ -32,7 +32,8 @@ const TRACK_PROBE = `
   };
 `;
 
-const browser = await chromium.launch({ headless: true, executablePath: process.env.PW_EXECUTABLE || undefined, args });
+const headless = process.env.HEADLESS !== 'false';
+const browser = await chromium.launch({ headless, executablePath: process.env.PW_EXECUTABLE || undefined, args });
 const logs = [];
 
 const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });

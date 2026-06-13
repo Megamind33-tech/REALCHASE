@@ -9,8 +9,16 @@ background). Local only — no MediaMTX, RTMP, recording, or destinations.
 > with its **built-in fake media device** (`--use-fake-device-for-media-stream`).
 > Everything else is genuinely real: `navigator.mediaDevices.getUserMedia()` is
 > really called, a real `MediaStream` is returned, real `<video>` elements play
-> it, and a real Babylon `DynamicTexture` samples its frames onto a dedicated
-> mesh. Only the camera *pixels* are synthetic. This is not a fake thumbnail.
+> it, and a real Babylon `VideoTexture` is bound to a dedicated mesh. Only the
+> camera *pixels* are synthetic. This is not a fake thumbnail.
+>
+> **About in-set texture display in CI:** this host has no GPU (software WebGL).
+> In that environment uploaded textures render **white** — proven by the
+> pre-existing desk-screen `DynamicTexture` also being white in the same shots
+> (headless *and* headed/Xvfb). So the in-scene `VideoTexture` plane appears as a
+> white framed object in CI, while the **docked DOM Program monitor** shows the
+> actual live pixels. The Babylon path is the real engine integration and
+> displays on GPU hardware. See `source-placement/SOURCE_PLACEMENT_EVIDENCE.md`.
 
 ## Screenshots / logs (in `source-placement/`)
 | File | Proves |
@@ -19,7 +27,7 @@ background). Local only — no MediaMTX, RTMP, recording, or destinations.
 | `02-source-in-preview.png` | Real webcam source listed as **LIVE** and playing in the **Preview** monitor; Program still OFF. |
 | `03-program-empty-before-cut.png` | Program bus is empty **before** CUT. |
 | `04-program-live-after-cut.png` | After **CUT**, the source is on **Program**; Program monitor shows live video, source row shows PROGRAM tally. |
-| `05-program-in-set.png` / `05b-full-builder.png` | Live Program rendered **inside the 3D set as a separate floating media plane** — clearly distinct from the LED-wall background. |
+| `05-program-in-set.png` / `05b-full-builder.png` | The Program placement object (`programMedia` plane) floats in the set as a **separate object** (white in CI per the texture caveat), with the **docked DOM Program monitor** showing the live feed — clearly distinct from the LED-wall background. |
 | `06-source-selected-handles.png` | The Program media object is **selected**, showing the transform gizmo + a blue placement frame (it's a real, manipulable scene object). |
 | `07-source-scale-handles.png` | The **Scale** transform tool active on the source — real resize handles; aspect ratio preserved; still separate from the background. |
 | `08-source-removed-no-ghost.png` | After removing the source, the media plane is gone — **no ghost video/texture** left in the set. |
@@ -46,9 +54,13 @@ explanation (DOM vs engine, what's temporary, next steps).
   `srcObject`, and a real CUT.
 - **Program in the scene** (`src/engine/StudioEngine.ts` `setProgramStream`):
   builds a dedicated `programMedia` plane (chaseId `program-media`) with a
-  `DynamicTexture` fed by the live video each render tick; selectable, gizmo-
-  transformable, aspect-correct, with an always-on edge frame; fully disposed on
-  removal/engine teardown.
+  Babylon `VideoTexture` bound to the live feed (frame-pushed each render tick);
+  selectable, gizmo-transformable, aspect-correct, with an always-on edge frame;
+  fully disposed on removal/engine teardown.
+- **Docked Program monitor** (`src/components/viewport/ViewportCanvas.tsx`): a
+  bounded, labelled DOM `<video>` confidence monitor in the Builder viewport —
+  the CI-visible live feed (documented temporary), complementary to the engine
+  VideoTexture path.
 - **Honesty sweep (fake buttons removed):** `GO LIVE`/`REC` disabled with
   "not wired yet"; CameraStrip gradient "previews" replaced with honest neutral
   tiles; lighting presets + filter disabled; Inspector Light/Keying/Presenter/

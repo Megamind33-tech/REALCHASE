@@ -1,60 +1,67 @@
 # Phase 2 — Source Placement Evidence
 
-This documents how the live video source is treated as a **separate broadcast
-object** inside CHASE PRO, not as a background image or a fake thumbnail.
+How the live video source is treated as a **separate broadcast object** inside
+CHASE PRO — not a background image, not a fake thumbnail, not a full-screen plate.
 
 ## The five layers are kept distinct
 1. **Virtual set / 3D environment** — the procedural newsroom (desk, LED walls,
    lights, floor). Untouched by the video pipeline.
 2. **Live video source** — a `Source` object in state with its own identity
-   (`src/sources/sourceTypes.ts`), a real `MediaStream`, status, and placement.
+   (`src/sources/sourceTypes.ts`): real `MediaStream`, status, placement mode.
 3. **Source placement object** — a dedicated Babylon mesh `programMedia`
-   (chaseId `program-media`) that carries the video texture. It is a separate,
-   selectable scene node with its own transform and an always-on edge frame.
+   (chaseId `program-media`): a separate, selectable scene node with its own
+   transform, an always-on blue edge frame, and a `VideoTexture` bound to the
+   live feed. It floats in front of the LED wall — never blended into it.
 4. **Preview output** — a DOM `<video>` confidence monitor in the Switcher.
-5. **Program output** — a DOM `<video>` confidence monitor in the Switcher **and**
-   the in-scene `programMedia` plane in the Builder viewport.
+5. **Program output** — a DOM `<video>` confidence monitor in the Switcher and a
+   docked Program monitor in the Builder viewport, plus the in-scene
+   `programMedia` plane.
 
-## Which rendering method is used where
-- **Preview & Program monitors (Switcher panel):** DOM `<video>` with
-  `srcObject`. This is the correct, standard way to show confidence monitors and
-  is **not** claimed to be engine integration.
-- **In-set Program placement (Builder viewport):** a real **Babylon
-  `DynamicTexture`** on the `programMedia` mesh. Each render tick the current
-  video frame is drawn into the texture's canvas and uploaded to the GPU
-  (`StudioEngine.drawProgramFrame`). This works identically on GPU and on
-  software WebGL (SwiftShader in CI), so the screenshots prove the feed is
-  genuinely sampled by the engine in 3D space.
+## Which rendering method is used where (and why)
+- **Engine integration (the real one):** the in-set `programMedia` plane uses a
+  Babylon **`VideoTexture`** bound to the managed `<video>`; frames are pushed to
+  the GPU each render tick (`StudioEngine.setProgramStream` + render loop
+  `programTexture.update()`). This is the canonical Babylon live-video path and
+  it displays the feed on GPU hardware.
+- **Confidence monitors (DOM):** Preview/Program monitors in the Switcher and the
+  docked Program monitor in the Builder viewport are DOM `<video>` with
+  `srcObject`. These are standard broadcast confidence views and are **not**
+  claimed to be engine integration.
 
-Why `DynamicTexture` (canvas) rather than Babylon `VideoTexture`: it renders
-reliably under headless software WebGL used for CI evidence, while remaining a
-real, GPU-sampled texture on the mesh. Functionally equivalent for this slice.
+### Important environment caveat (honest)
+This CI host has **no GPU**; Chromium runs on software WebGL (ANGLE/SwiftShader).
+In that environment, **uploaded textures sample as white** — geometry and
+lighting render correctly, but any texture upload does not display. This is **not
+a code bug**: the pre-existing desk-screen `DynamicTexture` ("CHASE NEWS") also
+renders white in the same screenshots, in **both headless and headed (Xvfb)**
+runs. Consequently, in CI screenshots the `programMedia` plane shows as a white
+framed object rather than the live pixels. The **docked DOM Program monitor**
+therefore guarantees the live Program pixels are visible in the viewport for
+evidence, while the Babylon `VideoTexture` path is the real engine integration
+that displays on GPU hardware.
+
+> This DOM monitor is the temporary, CI-visible representation. It is bounded,
+> labelled, and not a background; it does not pretend to be the engine texture.
+> **Next patch must visually validate the `VideoTexture` plane on a GPU host.**
 
 ## Placement guarantees (verified)
-- The source is placed as a **free-floating plane** in front of the LED wall, not
-  blended into the background. (`05-program-in-set.png`)
-- It is **selectable** with transform gizmo handles and a visible placement
-  frame. (`06-source-selected-handles.png`)
-- It supports **position / rotation / scale** via the standard transform tools;
-  the Scale tool shows real resize handles. (`07-source-scale-handles.png`)
-- **Aspect ratio is preserved** — the plane is scaled from the source's
-  `videoWidth/videoHeight`, so faces/bodies are not stretched; it is not
-  stretched across the whole scene.
-- It is **removable cleanly** — disposing the source disposes the mesh + texture
-  and detaches the video element; no ghost layer remains.
+- Placed as a **free-floating plane** in front of the LED wall, not blended into
+  the background. (`05-program-in-set.png`)
+- **Selectable** with transform gizmo handles + visible blue placement frame.
+  (`06-source-selected-handles.png`)
+- Supports **position / rotation / scale** via the standard transform tools; the
+  Scale tool shows real resize handles. (`07-source-scale-handles.png`)
+- **Aspect ratio preserved** — plane scaled from `videoWidth/videoHeight`, so
+  faces/bodies are not stretched and it is not stretched across the scene.
+- **Removable cleanly** — disposing the source disposes the mesh + VideoTexture
+  and detaches/removes the `<video>`; no ghost layer remains.
   (`08-source-removed-no-ghost.png`, `tracks-cleanup.txt`)
 
 ## What is still temporary / next steps
-- Only `mediaPlane` placement is wired. `screenInsert`, `presenterPlate`, and
+- Only `mediaPlane` placement is wired. `screenInsert`, `presenterPlate`,
   `backgroundPlate` are declared in the model but **not implemented**.
-- The plane auto-selects on CUT for placement; a dedicated placement panel
-  (numeric transform, snap-to-screen) is future work.
-- **Next steps toward virtual production:**
-  - `screenInsert`: map Program onto the desk screen / a monitor mesh.
-  - Presenter keying: chroma-key shader + alpha so a presenter plate composits
-    over the set.
-  - Camera tracking + lens/lighting match so the source sits correctly in the
-    virtual set.
-- Migrating the in-set feed from `DynamicTexture` to `VideoTexture` (or WebGL
-  external-texture) on GPU hosts is an optimisation, validated separately.
+- The in-set `VideoTexture` needs a **GPU-host screenshot** to visually confirm
+  pixels on the plane (CI software-GL can't show it). The DOM monitor covers CI.
+- Toward virtual production next: `screenInsert` (map onto a monitor mesh),
+  presenter chroma-key + alpha, camera tracking, and lens/lighting match.
 </content>

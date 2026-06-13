@@ -3,7 +3,6 @@ import {
   ArcRotateCamera,
   Color3,
   Color4,
-  DynamicTexture,
   Engine,
   FilesInputStore,
   FreeCamera,
@@ -16,6 +15,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VideoTexture,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { loadScene, type SceneLoaderQualitySelector } from 'babylonjs-editor-tools';
@@ -60,7 +60,7 @@ export class StudioEngine {
   private packNodes: Array<AbstractMesh | TransformNode> = [];
   // Program media (live source rendered as a separate, selectable scene object).
   private programPlane: Mesh | null = null;
-  private programTexture: DynamicTexture | null = null;
+  private programTexture: VideoTexture | null = null;
   private programVideoEl: HTMLVideoElement | null = null;
 
   init(canvas: HTMLCanvasElement) {
@@ -93,7 +93,7 @@ export class StudioEngine {
 
     this.engine.runRenderLoop(() => {
       if (this.disposed || !this.scene || !this.engine) return;
-      this.drawProgramFrame();
+      this.programTexture?.update(); // pull the latest video frame into the GPU texture
       this.scene.render();
     });
 
@@ -468,13 +468,9 @@ export class StudioEngine {
       const w = this.programVideoEl.videoWidth || 1280;
       const h = this.programVideoEl.videoHeight || 720;
       this.programTexture?.dispose();
-      const tex = new DynamicTexture('programMediaTex', { width: w, height: h }, this.scene, false);
-      // Initialise to black and upload once so the texture is never an
-      // uninitialised (white) sampler before the first video frame is drawn.
-      const ictx = tex.getContext() as unknown as CanvasRenderingContext2D;
-      ictx.fillStyle = '#000000';
-      ictx.fillRect(0, 0, w, h);
-      tex.update(false);
+      // Canonical live-video integration: a Babylon VideoTexture bound to the
+      // managed <video>. Frames are pushed each render tick (see render loop).
+      const tex = new VideoTexture('programFeed', this.programVideoEl, this.scene, false, true);
       const mat = this.programPlane.material as StandardMaterial;
       mat.emissiveTexture = tex;
       mat.emissiveColor = new Color3(1, 1, 1);
@@ -509,17 +505,6 @@ export class StudioEngine {
       this.programVideoEl = null;
     }
     this.emitSceneGraph();
-  }
-
-  /** Pull the current video frame into the Program media texture each render tick. */
-  private drawProgramFrame() {
-    const video = this.programVideoEl;
-    const texture = this.programTexture;
-    if (!video || !texture || video.readyState < 2) return;
-    const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
-    const size = texture.getSize();
-    ctx.drawImage(video, 0, 0, size.width, size.height);
-    texture.update(false);
   }
 
   getSceneNodes(): SceneNodeInfo[] {
