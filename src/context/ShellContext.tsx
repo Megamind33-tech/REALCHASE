@@ -129,22 +129,19 @@ function shellReducer(state: ShellState, action: ShellAction): ShellState {
       return { ...state, toast: `${action.action} — project service not connected` };
     case 'TOGGLE_BACKUP':
       return { ...state, backupEnabled: !state.backupEnabled, toast: state.backupEnabled ? 'Backup disabled' : 'Backup enabled' };
-    case 'TICK_METRICS': {
-      const cpu = 15 + Math.round(Math.random() * 75);
-      const gpu = 20 + Math.round(Math.random() * 75);
-      const warn = (cpu > 85 || gpu > 90) && !state.performanceWarningDismissed;
-      return {
-        ...state,
-        metrics: { ...state.metrics, cpu, gpu, ram: 40 + Math.round(Math.random() * 20) },
-        performanceWarning: warn,
-      };
-    }
     case 'SET_ENGINE_READY':
       return { ...state, engineReady: action.ready };
     case 'SET_TRANSFORM_MODE':
       return { ...state, transformMode: action.mode };
-    case 'UPDATE_ENGINE_FPS':
-      return { ...state, metrics: { ...state.metrics, fps: action.fps } };
+    case 'UPDATE_ENGINE_FPS': {
+      // Performance state is derived from real engine FPS — never fabricated.
+      const warn = state.engineReady && action.fps > 0 && action.fps < 24 && !state.performanceWarningDismissed;
+      return {
+        ...state,
+        metrics: { ...state.metrics, fps: action.fps },
+        performanceWarning: warn,
+      };
+    }
     default:
       return state;
   }
@@ -166,11 +163,6 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     const t = setTimeout(() => dispatch({ type: 'CLEAR_TOAST' }), 2400);
     return () => clearTimeout(t);
   }, [state.toast]);
-
-  useEffect(() => {
-    const interval = setInterval(() => dispatch({ type: 'TICK_METRICS' }), 4000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <ShellContext.Provider value={{ state, dispatch }}>

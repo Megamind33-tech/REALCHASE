@@ -35,7 +35,7 @@ export function StatusBar() {
       </span>
 
       <span className="mono" style={{ flex: 1, textAlign: 'center' }}>
-        CPU {metrics.cpu}% · GPU {metrics.gpu}% · Memory {metrics.memoryUsed} / {metrics.memoryTotal} GB · Disk {metrics.diskUsed} / {metrics.diskTotal} GB
+        {metrics.resolution} · {state.engineReady ? `${metrics.fps} fps` : 'Engine starting…'}
       </span>
 
       <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

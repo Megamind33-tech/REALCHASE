@@ -173,7 +173,6 @@ export type ShellAction =
   | { type: 'REDO' }
   | { type: 'FILE_ACTION'; action: string }
   | { type: 'TOGGLE_BACKUP' }
-  | { type: 'TICK_METRICS' }
   | { type: 'SET_ENGINE_READY'; ready: boolean }
   | { type: 'SET_TRANSFORM_MODE'; mode: TransformMode }
   | { type: 'UPDATE_ENGINE_FPS'; fps: number };

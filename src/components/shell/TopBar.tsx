@@ -57,11 +57,18 @@ export function TopBar() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--text-secondary)' }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--status-ok)' }} />
-          System OK
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: state.performanceWarning ? 'var(--status-warn)' : 'var(--status-ok)',
+            }}
+          />
+          {state.performanceWarning ? 'Performance Limited' : 'System OK'}
         </span>
         <span className="mono" style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-          CPU {metrics.cpu}% · GPU {metrics.gpu}% · RAM {metrics.ram}% · {metrics.resolution}, {metrics.fps} fps
+          {metrics.resolution} · {state.engineReady ? `${metrics.fps} fps` : '— fps'}
         </span>
       </div>
 
