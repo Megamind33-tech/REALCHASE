@@ -1,0 +1,42 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Tauri
+src-tauri/target
+
+# Env
+.env
+.env.*
+
+# External Forks
+/forks/
+
+# Generated files
+/auto.crt
+/auto.key
+
+# Tools Binaries & Archives
+/tools/**/*.zip
+/tools/**/*.exe
+/tools/**/*.EXE
+
+
+
