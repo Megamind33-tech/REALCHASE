@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Plus, Video } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { CAMERA_SHOTS } from '@/data/mock/studioData';
 
@@ -44,15 +44,17 @@ export function CameraStrip() {
                 borderRadius: 3,
                 position: 'relative',
                 overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                color: active ? 'var(--status-ok)' : 'var(--text-muted)',
               }}
             >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: `linear-gradient(${cam.id.charCodeAt(3) * 20}deg, #1e293b, #0f172a)`,
-                }}
-              />
+              {/* 3D viewport angle, not a live feed — no fake thumbnail preview. */}
+              <Video size={16} />
+              <span style={{ fontSize: 8 }}>{cam.shortLabel}</span>
             </div>
             <span
               style={{

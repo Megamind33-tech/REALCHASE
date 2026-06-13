@@ -4,6 +4,7 @@ export type { TransformMode };
 
 export type ModuleId =
   | 'builder'
+  | 'switcher'
   | 'scenes'
   | 'assets'
   | 'graphics'

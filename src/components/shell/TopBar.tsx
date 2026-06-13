@@ -73,20 +73,13 @@ export function TopBar() {
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <Button
-          variant={state.isRecording ? 'danger' : 'secondary'}
-          onClick={() => dispatch({ type: 'TOGGLE_REC' })}
-          aria-pressed={state.isRecording}
-        >
-          <Circle size={10} fill={state.isRecording ? '#fff' : 'var(--status-rec)'} className={state.isRecording ? 'rec-pulse' : ''} />
+        {/* Disabled until a real recorder/output pipeline exists — operator
+            safety: never show REC/LIVE unless something real is happening. */}
+        <Button variant="secondary" disabled title="Recorder not wired yet">
+          <Circle size={10} fill="var(--status-rec)" />
           REC
         </Button>
-        <Button
-          variant="danger"
-          onClick={() => dispatch({ type: 'TOGGLE_LIVE' })}
-          aria-pressed={state.isLive}
-          style={{ background: state.isLive ? 'var(--status-error)' : 'var(--status-rec)' }}
-        >
+        <Button variant="secondary" disabled title="Live output not wired yet">
           GO LIVE
         </Button>
       </div>

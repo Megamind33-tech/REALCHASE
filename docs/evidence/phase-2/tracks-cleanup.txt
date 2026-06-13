@@ -1,0 +1,16 @@
+Camera track lifecycle (proves no leaked MediaStream tracks).
+Captured: 2026-06-13T08:09:20.313Z
+
+navigator.permissions camera state: granted
+
+Tracks while source LIVE (readyState should be "live"):
+[[{"kind":"video","readyState":"live"}]]
+
+Tracks after source removed (readyState MUST be "ended"):
+[[{"kind":"video","readyState":"ended"}]]
+
+Streams created: 1 (no duplicate streams expected for a single Add Webcam)
+
+--- console ---
+[log] BJS - [08:09:06]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [08:09:12]: Babylon.js v9.9.1 - WebGL2
