@@ -1,0 +1,40 @@
+import { chromium } from 'playwright';
+import { setTimeout as sleep } from 'node:timers/promises';
+import fs from 'node:fs';
+const url = process.env.URL || 'http://localhost:4177';
+const out = 'docs/evidence/phase-2/keying-compositor';
+fs.mkdirSync(out, { recursive: true });
+const args = ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream'];
+const browser = await chromium.launch({ headless: true, executablePath: process.env.PW_EXECUTABLE, args });
+const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+await ctx.grantPermissions(['camera','microphone'], { origin: url });
+const page = await ctx.newPage();
+const logs=[]; page.on('console',m=>logs.push(`[${m.type()}] ${m.text()}`)); page.on('pageerror',e=>logs.push(`[err] ${e.message}`));
+const vp = async (n) => { const e = await page.$('#babylon-viewport'); if (e) await e.screenshot({ path: `${out}/${n}` }); };
+const sel = (v) => page.evaluate((val)=>{const s=[...document.querySelectorAll('select')].find(x=>[...x.options].some(o=>o.value===val&&!o.disabled)); if(s){s.value=val; s.dispatchEvent(new Event('change',{bubbles:true}));}}, v);
+const rng = (label,v) => page.evaluate(({label,v})=>{const r=[...document.querySelectorAll('input[type=range]')].find(x=>x.getAttribute('aria-label')===label); if(r){const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; set.call(r,String(v)); r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true}));}}, {label,v});
+const overlay = async () => (await page.evaluate(()=>document.querySelector('#babylon-viewport')?.textContent||'')).trim();
+await page.goto(url,{waitUntil:'load'}); await page.waitForSelector('#chase-babylon-canvas'); await sleep(2200);
+await page.click('button[title="Switcher"]'); await sleep(400);
+await page.getByRole('button',{name:'Add Webcam'}).click(); await page.waitForSelector('video'); await sleep(1200);
+await page.getByRole('button',{name:'CUT'}).click(); await sleep(700);
+await sel('presenterPlate'); await sleep(250); await sel('chromaKey'); await sleep(300);
+await page.getByRole('button',{name:'Auto'}).click(); await sleep(200);
+await rng('Similarity',0.16); await rng('Spill',0.8); await sleep(250);
+// light-wrap OFF baseline
+await rng('Light wrap',0); await sleep(300);
+await page.click('button[title="Builder"]'); await page.waitForSelector('#chase-babylon-canvas'); await sleep(3000);
+await vp('01-lightwrap-off.png'); const fpsOff = await overlay();
+// light-wrap ON (backdrop RTT renders)
+await page.click('button[title="Switcher"]'); await sleep(250); await rng('Light wrap',0.95); await sleep(300);
+await page.click('button[title="Builder"]'); await page.waitForSelector('#chase-babylon-canvas'); await sleep(3500);
+await vp('02-lightwrap-on.png'); const fpsOn = await overlay();
+// occlusion: screenInsert onto the LED wall (z=7) so pillars/desk (in front) occlude the video
+await page.click('button[title="Switcher"]'); await sleep(250); await sel('screenInsert'); await sleep(250);
+await page.evaluate(()=>{const s=[...document.querySelectorAll('select')].find(x=>[...x.options].some(o=>o.value==='led-main')); if(s){s.value='led-main'; s.dispatchEvent(new Event('change',{bubbles:true}));}});
+await sleep(400);
+await page.click('button[title="Builder"]'); await page.waitForSelector('#chase-babylon-canvas'); await sleep(3500);
+await vp('03-occlusion-screeninsert-ledwall.png'); const fpsOcc = await overlay();
+fs.writeFileSync(`${out}/compositor.txt`, [`fps lightwrap off: ${fpsOff}`, `fps lightwrap on (half-res backdrop RTT): ${fpsOn}`, `fps screenInsert occlusion: ${fpsOcc}`, '', '--- console ---', ...logs].join('\n'));
+await browser.close();
+console.log('off:', fpsOff, '| on:', fpsOn, '| occ:', fpsOcc);

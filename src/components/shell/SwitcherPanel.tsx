@@ -143,6 +143,7 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
           <KeySlider label="Edge denoise" value={keying.denoise} min={0} max={1} step={0.01} onChange={(v) => set({ denoise: v })} />
           <KeySlider label="Black clip" value={keying.blackClip} min={0} max={0.5} step={0.01} onChange={(v) => set({ blackClip: v })} />
           <KeySlider label="White clip" value={keying.whiteClip} min={0.5} max={1} step={0.01} onChange={(v) => set({ whiteClip: v })} />
+          <KeySlider label="Light wrap" value={keying.lightWrap} min={0} max={1} step={0.01} onChange={(v) => set({ lightWrap: v })} />
         </>
       )}
       <KeySlider label="Opacity" value={keying.opacity} min={0} max={1} step={0.01} onChange={(v) => set({ opacity: v })} />
