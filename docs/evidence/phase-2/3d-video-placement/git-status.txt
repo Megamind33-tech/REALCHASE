@@ -1,0 +1,2 @@
+$ git status --short   (after 3D-placement evidence commit, 4b5d44d)
+(empty = working tree clean)
