@@ -1,0 +1,4 @@
+$ git status --short   (immediately after the Phase 2 evidence commit, c108d87)
+(empty output = working tree clean)
+
+Only subsequent change is adding this evidence file itself, then committed.
