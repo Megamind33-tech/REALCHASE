@@ -8,8 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { StudioEngine } from '@/engine/StudioEngine';
-import type { SceneNodeInfo, TransformMode } from '@/engine/sceneRegistry';
-import type { CameraId } from '@/engine/sceneRegistry';
+import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -30,7 +29,17 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const { state, dispatch } = useShell();
 
   const initCanvas = useCallback((canvas: HTMLCanvasElement) => {
-    if (engineRef.current) return;
+    const current = engineRef.current;
+    if (current) {
+      // React StrictMode re-invokes this effect with the SAME canvas element —
+      // reuse the existing engine instead of building a second one.
+      if (current.getCanvas() === canvas) return;
+      // The canvas element actually changed (e.g. leaving and re-entering the
+      // Builder module remounts ViewportCanvas). Tear the old engine down so the
+      // new canvas gets a live render target instead of a blank frame.
+      current.dispose();
+      engineRef.current = null;
+    }
     const instance = new StudioEngine();
     engineRef.current = instance;
     setEngine(instance);
@@ -90,16 +99,8 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine || !state.engineReady) return;
-    engine.setTransformMode(state.transformMode as TransformMode);
+    engine.setTransformMode(state.transformMode);
   }, [state.transformMode, state.engineReady]);
-
-  useEffect(() => {
-    return () => {
-      engineRef.current?.dispose();
-      engineRef.current = null;
-      setEngine(null);
-    };
-  }, []);
 
   const addObject = useCallback((objectId: string) => {
     return engineRef.current?.addSceneObject(objectId) ?? false;

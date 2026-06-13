@@ -17,6 +17,8 @@
     "@babylonjs/gui": "9.9.1",
     "@babylonjs/loaders": "9.9.1",
     "@babylonjs/materials": "9.9.1",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "babylonjs-editor-tools": "5.4.2-alpha.2",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
@@ -28,6 +30,7 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "playwright": "^1.60.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5"
   },

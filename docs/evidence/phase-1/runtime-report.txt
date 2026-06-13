@@ -1,0 +1,28 @@
+URL: http://localhost:4174
+Captured: 2026-06-13T07:34:00.812Z
+
+--- Top bar text (telemetry) ---
+CHASE STUDIO PRO
+Apex Evening Broadcast
+Morning Sports Desk
+Talkline Friday
+Save
+Open
+New
+Import
+Performance Limited
+1080p59.94 · 14 fps
+REC
+GO LIVE
+
+--- Status bar text ---
+Project Status: Performance Limited
+1080p59.94 · 14 fps
+Auto Save: 2 min ago
+Backup: On
+Live Chat
+
+--- Google Fonts network requests: 0 ---
+
+--- Console / page errors ---
+[log] BJS - [07:33:54]: Babylon.js v9.9.1 - WebGL2

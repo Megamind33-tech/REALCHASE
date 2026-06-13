@@ -1,3 +1,7 @@
+import type { TransformMode } from '@/engine/sceneRegistry';
+
+export type { TransformMode };
+
 export type ModuleId =
   | 'builder'
   | 'scenes'
@@ -99,8 +103,6 @@ export interface DeskProperties {
   eyeBrightness: number;
   teethWhitening: number;
 }
-
-export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
 export interface ShellState {
   activeModule: ModuleId;
