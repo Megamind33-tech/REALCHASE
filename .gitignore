@@ -8,6 +8,9 @@ node_modules
 dist
 dist-ssr
 
+# Use yarn (see packageManager in package.json); ignore npm lockfile
+package-lock.json
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
