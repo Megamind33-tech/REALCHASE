@@ -37,6 +37,8 @@ export interface KeyingSettings {
   blackClip: number;
   /** Matte white point — firms the solid core of the subject. */
   whiteClip: number;
+  /** Light-wrap amount — bleeds the rendered backdrop into subject edges (0 = off). */
+  lightWrap: number;
   opacity: number;
   /** When true the shader renders the alpha matte (grayscale) for calibration. */
   showMatte: boolean;
@@ -51,6 +53,7 @@ export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
   denoise: 0,
   blackClip: 0,
   whiteClip: 1,
+  lightWrap: 0,
   opacity: 1,
   showMatte: false,
 };

@@ -1,0 +1,12 @@
+fps lightwrap off: CAM 1 · BALANCED · 10 fps
+fps lightwrap on (half-res backdrop RTT): CAM 1 · BALANCED · 10 fps
+fps screenInsert occlusion: CAM 1 · BALANCED · 11 fps
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [18:33:43]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:33:52]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:33:57]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:34:04]: Babylon.js v9.9.1 - WebGL2

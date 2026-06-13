@@ -12,9 +12,12 @@ import {
   MeshBuilder,
   ImportMeshAsync,
   PointerEventTypes,
+  RawTexture,
+  RenderTargetTexture,
   Scene,
   ShaderMaterial,
   StandardMaterial,
+  Texture,
   TransformNode,
   Vector2,
   Vector3,
@@ -52,7 +55,7 @@ let mediaShaderRegistered = false;
 function registerMediaShader() {
   if (mediaShaderRegistered) return;
   Effect.ShadersStore[`${MEDIA_SHADER}VertexShader`] =
-    'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; void main(){ vUv = uv; gl_Position = worldViewProjection * vec4(position, 1.0); }';
+    'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; varying vec2 vScreen; void main(){ vUv = uv; vec4 cp = worldViewProjection * vec4(position, 1.0); vScreen = (cp.xy / cp.w) * 0.5 + 0.5; gl_Position = cp; }';
   // Single-pass, single-sample broadcast-style keyer (no extra render passes /
   // no per-frame CPU work) so it stays smooth: keys in CbCr chroma space
   // (luminance-tolerant → clean edges under uneven lighting), with a
@@ -70,8 +73,11 @@ function registerMediaShader() {
     'uniform float blackClip;',  // matte black point
     'uniform float whiteClip;',  // matte white point
     'uniform vec2 texel;',       // 1 / texture size, for neighbour taps
+    'uniform sampler2D bgTexture;', // rendered backdrop (scene minus this plane)
+    'uniform float lightWrap;',  // backdrop bleed into subject edges (0 = off)
     'uniform float opacity;',
     'uniform int showMatte;',    // 1 => render the alpha matte for calibration
+    'varying vec2 vScreen;',     // this fragment's screen position (for backdrop sampling)
     // BT.601 chroma (Cb,Cr) — keying on chroma only ignores brightness, so
     // shadows/highlights on the backdrop don't tear holes in the key.
     'vec2 chroma(vec3 c){ return vec2(-0.168736*c.r - 0.331264*c.g + 0.5*c.b, 0.5*c.r - 0.418688*c.g - 0.081312*c.b); }',
@@ -103,6 +109,12 @@ function registerMediaShader() {
     '    else if (keyColor.b >= keyColor.r && keyColor.b >= keyColor.g) { sp.b = min(sp.b, max(sp.r, sp.g)); }',
     '    else { sp.r = min(sp.r, max(sp.g, sp.b)); }',
     '    rgb = mix(c.rgb, sp, clamp(spill, 0.0, 1.0));',
+    // Light-wrap (gated → zero extra sample when off): bleed the real rendered
+    // backdrop into translucent subject edges so the source sits in the set.
+    '    if (lightWrap > 0.001) {',
+    '      vec3 bg = texture2D(bgTexture, vec2(vScreen.x, 1.0 - vScreen.y)).rgb;',
+    '      rgb = mix(rgb, bg, clamp(lightWrap * (1.0 - alpha), 0.0, 1.0));',
+    '    }',
     '  } else if (keyMode == 2) {',
     '    alpha = c.a;',
     '  }',
@@ -144,6 +156,8 @@ export class StudioEngine {
   private programVideoEl: HTMLVideoElement | null = null;
   private programStream: MediaStream | null = null;
   private programPlacement: PlacementMode = 'mediaPlane';
+  private backdropRtt: RenderTargetTexture | null = null;
+  private dummyBgTexture: RawTexture | null = null;
   private screenInsertTargets = new Set(['led-main', 'led-side', 'desk-screen', 'screen-insert-test']);
 
   init(canvas: HTMLCanvasElement) {
@@ -618,7 +632,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'opacity', 'showMatte'], samplers: ['videoSampler'], needAlphaBlending: true },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'lightWrap', 'opacity', 'showMatte'], samplers: ['videoSampler', 'bgTexture'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -638,6 +652,11 @@ export class StudioEngine {
       mat.setFloat('blackClip', 0);
       mat.setFloat('whiteClip', 1);
       mat.setVector2('texel', new Vector2(1 / 1280, 1 / 720));
+      mat.setFloat('lightWrap', 0);
+      if (!this.dummyBgTexture) {
+        this.dummyBgTexture = RawTexture.CreateRGBATexture(new Uint8Array([0, 0, 0, 255]), 1, 1, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
+      }
+      mat.setTexture('bgTexture', this.dummyBgTexture); // backdrop bound only when light-wrap is on
       mat.setFloat('opacity', 1);
       mat.setInt('showMatte', 0);
       this.programPlane = plane;
@@ -692,7 +711,16 @@ export class StudioEngine {
       if (target instanceof Mesh) {
         this.programPlane.position.copyFrom(target.getAbsolutePosition());
         this.programPlane.rotation.copyFrom(target.rotation);
-        this.programPlane.scaling = new Vector3(aspect * 1.2, 1.2, 1);
+        // Fit the video (aspect-preserved) to the target screen's real size so
+        // a "screen insert" fills its monitor/wall instead of a fixed size.
+        const ext = target.getBoundingInfo().boundingBox.extendSizeWorld;
+        const tw = Math.max(0.1, ext.x * 2);
+        const th = Math.max(0.1, ext.y * 2);
+        let h = th;
+        let w = th * aspect;
+        if (w > tw) { w = tw; h = tw / aspect; }
+        this.programPlane.scaling = new Vector3(w, h, 1);
+        this.programPlane.position.z -= 0.02; // sit just in front of the screen mesh
         this.programPlane.metadata = { chaseId: 'program-media', displayName: `Program Media → ${target.metadata?.displayName ?? screenTargetId}`, screenInsertTargetId: screenTargetId };
         return;
       }
@@ -713,12 +741,51 @@ export class StudioEngine {
     mat.setFloat('denoise', keying.denoise ?? 0);
     mat.setFloat('blackClip', keying.blackClip ?? 0);
     mat.setFloat('whiteClip', keying.whiteClip ?? 1);
+    const wrap = mode === 'chromaKey' ? (keying.lightWrap ?? 0) : 0;
+    mat.setFloat('lightWrap', wrap);
+    this.updateBackdropRtt(wrap > 0.001, mat);
     mat.setFloat('opacity', keying.opacity);
     mat.setInt('showMatte', keying.showMatte ? 1 : 0);
     mat.needAlphaBlending = () => mode !== 'disabled' || keying.opacity < 1;
   }
 
+  /**
+   * Light-wrap needs the rendered backdrop, so when it's enabled we render the
+   * scene (minus the Program plane) to a HALF-RES render target once per frame
+   * and feed it to the shader. Disabled by default → the target isn't created,
+   * so there is zero extra render cost unless the operator turns light-wrap on.
+   */
+  private updateBackdropRtt(enabled: boolean, mat: ShaderMaterial) {
+    if (!this.scene || !this.programPlane) return;
+    if (enabled) {
+      if (!this.backdropRtt) {
+        const rtt = new RenderTargetTexture('programBackdrop', { ratio: 0.5 }, this.scene, false);
+        rtt.renderList = null; // whole scene...
+        rtt.wrapU = Texture.CLAMP_ADDRESSMODE;
+        rtt.wrapV = Texture.CLAMP_ADDRESSMODE;
+        // ...minus the Program plane itself (so the plane samples what's behind it).
+        rtt.onBeforeRenderObservable.add(() => { if (this.programPlane) this.programPlane.isVisible = false; });
+        rtt.onAfterRenderObservable.add(() => { if (this.programPlane) this.programPlane.isVisible = true; });
+        this.scene.customRenderTargets.push(rtt);
+        this.backdropRtt = rtt;
+      }
+      mat.setTexture('bgTexture', this.backdropRtt);
+    } else if (this.backdropRtt) {
+      const i = this.scene.customRenderTargets.indexOf(this.backdropRtt);
+      if (i >= 0) this.scene.customRenderTargets.splice(i, 1);
+      this.backdropRtt.dispose();
+      this.backdropRtt = null;
+      if (this.dummyBgTexture) mat.setTexture('bgTexture', this.dummyBgTexture);
+    }
+  }
+
   private clearProgramMedia() {
+    if (this.backdropRtt && this.scene) {
+      const i = this.scene.customRenderTargets.indexOf(this.backdropRtt);
+      if (i >= 0) this.scene.customRenderTargets.splice(i, 1);
+      this.backdropRtt.dispose();
+      this.backdropRtt = null;
+    }
     this.programTexture?.dispose();
     this.programTexture = null;
     if (this.programPlane) {
@@ -809,6 +876,10 @@ export class StudioEngine {
     this.disposed = true;
     // Drop the Program media texture + off-screen video (never stops tracks —
     // SourcesContext owns the MediaStream lifecycle).
+    this.backdropRtt?.dispose();
+    this.backdropRtt = null;
+    this.dummyBgTexture?.dispose();
+    this.dummyBgTexture = null;
     this.programTexture?.dispose();
     this.programTexture = null;
     this.programPlane = null;
