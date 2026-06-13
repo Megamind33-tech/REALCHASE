@@ -1,3 +1,10 @@
+> **UPDATE:** the in-set live video now renders as a real **Babylon
+> ShaderMaterial + VideoTexture** plane (the DOM Program monitor was removed). The
+> earlier "CI renders textures white" caveat was root-caused to Babylon's
+> `StandardMaterial` and fixed with a custom shader. Authoritative current
+> evidence: `3d-video-placement/VIDEO_PLACEMENT_EVIDENCE.md` and
+> `DEMO_REMOVAL_AUDIT.md`.
+
 # Phase 2 — Evidence (Reliable Source Import & Switching)
 
 The first **real** broadcast function in CHASE PRO: a real live source, real

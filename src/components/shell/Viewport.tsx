@@ -107,7 +107,7 @@ export function Viewport() {
           >
             <Focus size={14} />
           </IconButton>
-          <IconButton label="Toggle grid" onClick={() => dispatch({ type: 'SHOW_TOAST', message: 'Grid toggle — editor integration' })}>
+          <IconButton label="Toggle grid (not wired yet)" disabled>
             <Grid3x3 size={14} />
           </IconButton>
           <IconButton
