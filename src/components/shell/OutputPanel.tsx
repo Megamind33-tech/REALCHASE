@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Slider, Meter } from '@/components/ui/Controls';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
@@ -7,38 +7,12 @@ import type { AudioChannel } from '@/context/shellTypes';
 
 export function OutputPanel() {
   const { state, dispatch } = useShell();
+  // Mute/solo are real UI state, but there is no audio device yet, so meters are
+  // held at idle (0) rather than animated with fake levels. Live metering lands
+  // with the Phase 2 audio pipeline.
   const [channels, setChannels] = useState<AudioChannel[]>(AUDIO_CHANNELS);
-  const [recSeconds, setRecSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!state.isRecording) return;
-    const t = setInterval(() => setRecSeconds((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [state.isRecording]);
-
-  useEffect(() => {
-    if (!state.isRecording) setRecSeconds(0);
-  }, [state.isRecording]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setChannels((prev) =>
-        prev.map((ch) => ({
-          ...ch,
-          level: ch.muted ? 0 : Math.max(5, Math.min(95, ch.level + (Math.random() - 0.5) * 20)),
-        })),
-      );
-    }, 200);
-    return () => clearInterval(interval);
-  }, []);
 
   if (state.rightPanelCollapsed || state.activeModule === 'settings') return null;
-
-  const formatRec = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = (s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
-  };
 
   return (
     <div
@@ -79,11 +53,14 @@ export function OutputPanel() {
           onChange={(v) => dispatch({ type: 'SET_TRANSITION_DURATION', duration: v / 10 })}
         />
 
-        <div className="section-label" style={{ margin: '12px 0 6px' }}>Audio Mixer</div>
+        <div className="section-label" style={{ margin: '12px 0 4px' }}>Audio Mixer</div>
+        <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 6 }}>
+          No audio device connected — live levels arrive in Phase 2.
+        </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 12 }}>
           {channels.map((ch) => (
             <div key={ch.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <Meter level={ch.level} muted={ch.muted} />
+              <Meter level={0} muted={ch.muted} />
               <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{ch.label}</span>
               <div style={{ display: 'flex', gap: 2 }}>
                 <button
@@ -139,9 +116,9 @@ export function OutputPanel() {
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>REC</div>
             <div className="mono" style={{ color: state.isRecording ? 'var(--status-rec)' : 'var(--text-primary)' }}>
-              {state.isRecording ? formatRec(recSeconds) : 'Standby'}
+              {state.isRecording ? 'Armed' : 'Standby'}
             </div>
-            {state.isRecording && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>~124 MB</div>}
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Recorder not connected (Phase 2)</div>
           </div>
           <div
             style={{
@@ -154,9 +131,10 @@ export function OutputPanel() {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Program Monitor</div>
-            <div style={{ color: state.isLive ? 'var(--status-ok)' : 'var(--text-muted)' }}>
-              {state.isLive ? 'ON AIR' : 'Offline'}
+            <div style={{ color: state.isLive ? 'var(--status-warn)' : 'var(--text-muted)' }}>
+              {state.isLive ? 'Armed' : 'Offline'}
             </div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Output not connected (Phase 2)</div>
             <Button
               variant="secondary"
               style={{ marginTop: 4, height: 20, fontSize: 9, width: '100%' }}
@@ -181,14 +159,7 @@ export function OutputPanel() {
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>{dest.name}</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {state.isLive && (
-                <span style={{ color: 'var(--status-ok)', fontWeight: 600, fontSize: 9 }}>LIVE</span>
-              )}
-              <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                {dest.resolution} · {dest.bitrate}
-              </span>
-            </span>
+            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Not connected</span>
           </div>
         ))}
       </div>

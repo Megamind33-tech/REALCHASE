@@ -413,6 +413,11 @@ export class StudioEngine {
     return [...nodes.values()];
   }
 
+  /** The canvas this engine is bound to, or null before init/after dispose. */
+  getCanvas(): HTMLCanvasElement | null {
+    return this.canvas;
+  }
+
   subscribe(listener: StudioEngineListener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -430,5 +435,6 @@ export class StudioEngine {
     this.engine?.dispose();
     this.engine = null;
     this.scene = null;
+    this.canvas = null;
   }
 }

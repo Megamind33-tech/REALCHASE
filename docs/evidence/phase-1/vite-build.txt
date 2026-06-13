@@ -1,0 +1,24 @@
+$ npm run build  (tsc -b && vite build)
+
+dist/assets/selection.vertex-BS_0_AzX.js                             2.12 kB │ gzip:     0.81 kB
+dist/assets/gaussianSplattingVoxel.vertex-C8VhG7c_.js                2.35 kB │ gzip:     0.85 kB
+dist/assets/webAudioBus-acYyPNoA.js                                  2.40 kB │ gzip:     0.79 kB
+dist/assets/selection.vertex-hUoLq-AD.js                             2.46 kB │ gzip:     0.89 kB
+dist/assets/iesTextureLoader-CiBDneaq.js                             2.70 kB │ gzip:     1.17 kB
+dist/assets/gaussianSplatting.vertex-CRRhyppI.js                     3.14 kB │ gzip:     1.17 kB
+dist/assets/textureProcessor.fragment-B3QCd-TL.js                    3.49 kB │ gzip:     1.00 kB
+dist/assets/gaussianSplatting.vertex-BbtjyzTW.js                     3.99 kB │ gzip:     1.29 kB
+dist/assets/textureProcessor.fragment-DEtC3e8r.js                    4.38 kB │ gzip:     1.18 kB
+dist/assets/selectionOutline.fragment-DV9IfgOC.js                    4.82 kB │ gzip:     1.00 kB
+dist/assets/selectionOutline.fragment-j955ibGh.js                    6.09 kB │ gzip:     1.12 kB
+dist/assets/dds-DTZwRFCU.js                                          7.00 kB │ gzip:     2.46 kB
+dist/assets/pbrMaterialLoadingAdapter-D7GnSlcJ.js                   12.55 kB │ gzip:     2.40 kB
+dist/assets/ktxTextureLoader-BRHymbUQ.js                            14.90 kB │ gzip:     4.31 kB
+dist/assets/openpbrMaterialLoadingAdapter-BpOBsIRx.js               22.44 kB │ gzip:     5.24 kB
+dist/assets/index-klvfMJHS.js                                    7,227.40 kB │ gzip: 1,622.97 kB
+
+(!) Some chunks are larger than 2000 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 2m 9s
