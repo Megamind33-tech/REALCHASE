@@ -1,0 +1,8 @@
+crop L0.12 R0.62 T0.1 B0.66 (matte should be white only inside that rect)
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [18:50:09]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:50:17]: Babylon.js v9.9.1 - WebGL2

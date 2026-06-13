@@ -39,6 +39,11 @@ export interface KeyingSettings {
   whiteClip: number;
   /** Light-wrap amount — bleeds the rendered backdrop into subject edges (0 = off). */
   lightWrap: number;
+  /** Garbage matte rectangle in normalised frame coords (everything outside is cut). */
+  garbageLeft: number;
+  garbageTop: number;
+  garbageRight: number;
+  garbageBottom: number;
   opacity: number;
   /** When true the shader renders the alpha matte (grayscale) for calibration. */
   showMatte: boolean;
@@ -54,6 +59,10 @@ export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
   blackClip: 0,
   whiteClip: 1,
   lightWrap: 0,
+  garbageLeft: 0,
+  garbageTop: 0,
+  garbageRight: 1,
+  garbageBottom: 1,
   opacity: 1,
   showMatte: false,
 };

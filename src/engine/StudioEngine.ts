@@ -21,6 +21,7 @@ import {
   TransformNode,
   Vector2,
   Vector3,
+  Vector4,
   VideoTexture,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
@@ -75,6 +76,7 @@ function registerMediaShader() {
     'uniform vec2 texel;',       // 1 / texture size, for neighbour taps
     'uniform sampler2D bgTexture;', // rendered backdrop (scene minus this plane)
     'uniform float lightWrap;',  // backdrop bleed into subject edges (0 = off)
+    'uniform vec4 garbage;',     // garbage matte rect (minX,minY,maxX,maxY); default 0,0,1,1
     'uniform float opacity;',
     'uniform int showMatte;',    // 1 => render the alpha matte for calibration
     'varying vec2 vScreen;',     // this fragment's screen position (for backdrop sampling)
@@ -82,6 +84,8 @@ function registerMediaShader() {
     // shadows/highlights on the backdrop don't tear holes in the key.
     'vec2 chroma(vec3 c){ return vec2(-0.168736*c.r - 0.331264*c.g + 0.5*c.b, 0.5*c.r - 0.418688*c.g - 0.081312*c.b); }',
     'float keyAlpha(vec3 c){ float d = distance(chroma(c), chroma(keyColor)); return smoothstep(similarity, similarity + max(smoothness, 0.0001), d); }',
+    // Garbage matte: 1 inside the rect (soft edge), 0 outside. Default rect 0..1 → no-op.
+    'float garbMask(vec2 p){ float f = 0.012; float mx = smoothstep(garbage.x - f, garbage.x + f, p.x) * (1.0 - smoothstep(garbage.z - f, garbage.z + f, p.x)); float my = smoothstep(garbage.y - f, garbage.y + f, p.y) * (1.0 - smoothstep(garbage.w - f, garbage.w + f, p.y)); return mx * my; }',
     'void main(){',
     '  vec2 uv = vec2(vUv.x, 1.0 - vUv.y);',
     '  vec4 c = texture2D(videoSampler, uv);',
@@ -101,6 +105,7 @@ function registerMediaShader() {
     // Matte clip (black/white points) then a free smootherstep edge.
     '    a = clamp((a - blackClip) / max(whiteClip - blackClip, 0.0001), 0.0, 1.0);',
     '    a = a * a * (3.0 - 2.0 * a);',
+    '    a *= garbMask(uv);', // crop stray backdrop objects outside the talent area
     '    alpha = a;',
     // Luminance-preserving despill: cap the dominant key channel at the brighter
     // of the other two so fringe loses the key tint without going dark.
@@ -632,7 +637,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'lightWrap', 'opacity', 'showMatte'], samplers: ['videoSampler', 'bgTexture'], needAlphaBlending: true },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'lightWrap', 'garbage', 'opacity', 'showMatte'], samplers: ['videoSampler', 'bgTexture'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -653,6 +658,7 @@ export class StudioEngine {
       mat.setFloat('whiteClip', 1);
       mat.setVector2('texel', new Vector2(1 / 1280, 1 / 720));
       mat.setFloat('lightWrap', 0);
+      mat.setVector4('garbage', new Vector4(0, 0, 1, 1));
       if (!this.dummyBgTexture) {
         this.dummyBgTexture = RawTexture.CreateRGBATexture(new Uint8Array([0, 0, 0, 255]), 1, 1, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
       }
@@ -743,6 +749,7 @@ export class StudioEngine {
     mat.setFloat('whiteClip', keying.whiteClip ?? 1);
     const wrap = mode === 'chromaKey' ? (keying.lightWrap ?? 0) : 0;
     mat.setFloat('lightWrap', wrap);
+    mat.setVector4('garbage', new Vector4(keying.garbageLeft ?? 0, keying.garbageTop ?? 0, keying.garbageRight ?? 1, keying.garbageBottom ?? 1));
     this.updateBackdropRtt(wrap > 0.001, mat);
     mat.setFloat('opacity', keying.opacity);
     mat.setInt('showMatte', keying.showMatte ? 1 : 0);
