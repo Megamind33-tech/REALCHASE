@@ -426,9 +426,11 @@ export class StudioEngine {
       video.muted = true;
       video.playsInline = true;
       video.autoplay = true;
-      // Hidden but kept in the DOM: detached media elements get frame-throttled
-      // by Chromium, which would starve the texture of real frames.
-      video.style.cssText = 'position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;';
+      // Kept in the DOM AND within the viewport (tiny + near-invisible): browsers
+      // suspend frame decoding for off-screen/display:none video, which would
+      // starve the texture. This keeps real frames flowing without being seen.
+      video.style.cssText =
+        'position:fixed;right:0;bottom:0;width:16px;height:16px;opacity:0.01;z-index:0;pointer-events:none;';
       document.body.appendChild(video);
       this.programVideoEl = video;
     }
@@ -467,6 +469,12 @@ export class StudioEngine {
       const h = this.programVideoEl.videoHeight || 720;
       this.programTexture?.dispose();
       const tex = new DynamicTexture('programMediaTex', { width: w, height: h }, this.scene, false);
+      // Initialise to black and upload once so the texture is never an
+      // uninitialised (white) sampler before the first video frame is drawn.
+      const ictx = tex.getContext() as unknown as CanvasRenderingContext2D;
+      ictx.fillStyle = '#000000';
+      ictx.fillRect(0, 0, w, h);
+      tex.update(false);
       const mat = this.programPlane.material as StandardMaterial;
       mat.emissiveTexture = tex;
       mat.emissiveColor = new Color3(1, 1, 1);

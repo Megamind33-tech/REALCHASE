@@ -182,8 +182,8 @@ export function SwitcherPanel() {
         )}
 
         <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 14 }}>
-          The live <strong>Program</strong> source also renders on the studio LED wall — open the{' '}
-          <strong>Builder</strong> module to see it composited into the 3D set.
+          The live <strong>Program</strong> source is placed as a separate media plane inside the studio —
+          open the <strong>Builder</strong> module to see it as a selectable object in the 3D set.
         </p>
       </div>
     </div>
