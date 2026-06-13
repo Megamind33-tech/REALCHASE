@@ -120,7 +120,7 @@ export class StudioEngine {
     while (current) {
       const chaseId = current.metadata?.chaseId as string | undefined;
       if (chaseId && chaseId !== 'desk-screen') return chaseId;
-      current = current.parent;
+      current = current.parent as AbstractMesh | TransformNode | null;
     }
     return null;
   }

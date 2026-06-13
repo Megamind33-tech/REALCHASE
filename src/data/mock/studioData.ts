@@ -7,7 +7,7 @@ import type {
   StudioPack,
   TimelineLayer,
   AudioChannel,
-} from './shellTypes';
+} from '@/context/shellTypes';
 
 export const CAMERA_SHOTS: CameraShot[] = [
   { id: 'cam1', label: 'CAM 1 WIDE', shortLabel: 'WIDE' },
@@ -73,16 +73,19 @@ export const AUDIO_CHANNELS: AudioChannel[] = [
   { id: 'sfx', label: 'SFX', level: 32, muted: false, solo: false },
 ];
 
+// CPU/GPU/RAM/memory/disk are not measurable from the WebView yet, so they are
+// left at 0 (treated as "unmeasured") instead of fabricated. `fps` is filled in
+// live by the engine via UPDATE_ENGINE_FPS.
 export const initialMetrics: ShellState['metrics'] = {
-  cpu: 18,
-  gpu: 36,
-  ram: 45,
-  memoryUsed: 7.2,
-  memoryTotal: 16,
-  diskUsed: 240,
-  diskTotal: 512,
+  cpu: 0,
+  gpu: 0,
+  ram: 0,
+  memoryUsed: 0,
+  memoryTotal: 0,
+  diskUsed: 0,
+  diskTotal: 0,
   resolution: '1080p59.94',
-  fps: 60,
+  fps: 0,
 };
 
 export const initialDesk: ShellState['desk'] = {
