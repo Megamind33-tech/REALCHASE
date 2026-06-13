@@ -1,0 +1,9 @@
+denoise=0.7 blackClip=0.12 whiteClip=0.9 similarity=0.16
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [18:20:41]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:20:49]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:20:55]: Babylon.js v9.9.1 - WebGL2

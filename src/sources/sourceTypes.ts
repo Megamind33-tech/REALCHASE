@@ -31,6 +31,12 @@ export interface KeyingSettings {
   smoothness: number;
   /** Spill suppression amount (0 = none, 1 = full key-channel desaturation). */
   spill: number;
+  /** Edge matte denoise (0 = off / single sample; >0 blends neighbour taps). */
+  denoise: number;
+  /** Matte black point — raises the floor to kill grey haze in keyed areas. */
+  blackClip: number;
+  /** Matte white point — firms the solid core of the subject. */
+  whiteClip: number;
   opacity: number;
   /** When true the shader renders the alpha matte (grayscale) for calibration. */
   showMatte: boolean;
@@ -42,6 +48,9 @@ export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
   similarity: 0.32,
   smoothness: 0.08,
   spill: 0.5,
+  denoise: 0,
+  blackClip: 0,
+  whiteClip: 1,
   opacity: 1,
   showMatte: false,
 };
