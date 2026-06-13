@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Video, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSources } from '@/context/SourcesContext';
-import type { Source } from '@/sources/sourceTypes';
+import { DEFAULT_KEYING_SETTINGS, IMPLEMENTED_PLACEMENT_MODES, type KeyingMode, type Source } from '@/sources/sourceTypes';
 
 /** Renders a live MediaStream into a <video>. srcObject must be set imperatively. */
 function VideoView({ stream, label }: { stream: MediaStream | null; label: string }) {
@@ -48,16 +48,24 @@ function VideoView({ stream, label }: { stream: MediaStream | null; label: strin
 }
 
 function StatusBadge({ source }: { source: Source }) {
-  const map: Record<Source['status'], { label: string; color: string }> = {
-    idle: { label: 'IDLE', color: 'var(--text-muted)' },
-    connecting: { label: 'CONNECTING', color: 'var(--status-warn)' },
-    live: { label: 'LIVE', color: 'var(--status-ok)' },
-    error: { label: 'ERROR', color: 'var(--status-error)' },
-  };
-  const s = map[source.status];
+  const videoTrack = source.stream?.getVideoTracks()[0] ?? null;
+  const label = source.needsReconnect
+    ? 'NEEDS RECONNECT'
+    : source.status === 'live' && videoTrack?.readyState === 'live'
+      ? 'TRACK LIVE'
+      : source.status === 'live'
+        ? 'NO LIVE TRACK'
+        : source.status.toUpperCase();
+  const color = source.status === 'error'
+    ? 'var(--status-error)'
+    : label === 'TRACK LIVE'
+      ? 'var(--status-ok)'
+      : source.status === 'connecting'
+        ? 'var(--status-warn)'
+        : 'var(--text-muted)';
   return (
-    <span className="mono" style={{ fontSize: 9, fontWeight: 600, color: s.color }}>
-      {s.label}
+    <span data-testid="source-health-panel" className="mono" title="Source status is derived from MediaStream track state, reconnect state, or actual error state." style={{ fontSize: 9, fontWeight: 600, color }}>
+      {label}
     </span>
   );
 }
@@ -86,11 +94,11 @@ function Monitor({ title, stream, accent, tally }: { title: string; stream: Medi
 }
 
 export function SwitcherPanel() {
-  const { sources, addWebcamSource, removeSource, setPreview, cut, previewSource, programSource, roleOf, previewId } =
+  const { sources, addWebcamSource, removeSource, setPreview, cut, previewSource, programSource, roleOf, previewId, updateSourcePlacement, updateSourceKeying } =
     useSources();
 
   return (
-    <div className="scroll-y" style={{ flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 16 }}>
+    <div data-testid="switcher-surface" className="scroll-y" style={{ flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 16 }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Sources &amp; Switcher</h2>
@@ -164,6 +172,41 @@ export function SwitcherPanel() {
                       <div style={{ fontSize: 10, color: 'var(--status-error)', marginTop: 2 }}>{source.error}</div>
                     )}
                   </div>
+
+                  <select
+                    value={source.placement}
+                    onChange={(e) => updateSourcePlacement(source.id, e.target.value as Source['placement'], source.screenTargetId ?? 'led-main')}
+                    style={{ height: 24, fontSize: 10 }}
+                    aria-label={`Placement mode for ${source.name}`}
+                  >
+                    {IMPLEMENTED_PLACEMENT_MODES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+                    <option value="backgroundPlate" disabled>backgroundPlate · disabled until real output pipeline</option>
+                  </select>
+                  {source.placement === 'screenInsert' && (
+                    <select
+                      value={source.screenTargetId ?? 'led-main'}
+                      onChange={(e) => updateSourcePlacement(source.id, 'screenInsert', e.target.value)}
+                      style={{ height: 24, fontSize: 10 }}
+                      aria-label={`Screen insert target for ${source.name}`}
+                    >
+                      <option value="led-main">LED Wall Main</option>
+                      <option value="led-side">LED Wall Side</option>
+                      <option value="desk-screen">Desk Screen</option>
+                      <option value="screen-insert-test">Editable Screen Insert Target</option>
+                    </select>
+                  )}
+                  {source.placement === 'presenterPlate' && (
+                    <select
+                      value={source.keying?.mode ?? 'disabled'}
+                      onChange={(e) => updateSourceKeying(source.id, { ...(source.keying ?? DEFAULT_KEYING_SETTINGS), mode: e.target.value as KeyingMode })}
+                      style={{ height: 24, fontSize: 10 }}
+                      aria-label={`Presenter keying mode for ${source.name}`}
+                    >
+                      <option value="disabled">key disabled</option>
+                      <option value="chromaKey">chromaKey</option>
+                      <option value="alpha">alpha</option>
+                    </select>
+                  )}
                   <Button
                     variant="secondary"
                     disabled={source.status !== 'live'}
@@ -182,7 +225,7 @@ export function SwitcherPanel() {
         )}
 
         <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 14 }}>
-          The live <strong>Program</strong> source is placed as a separate media plane inside the studio —
+          The live <strong>Program</strong> source is placed as a separate Babylon object using mediaPlane, screenInsert, or presenterPlate —
           open the <strong>Builder</strong> module to see it as a selectable object in the 3D set.
         </p>
       </div>

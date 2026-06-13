@@ -1,0 +1,37 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+Downloading Chrome for Testing 148.0.7778.96 (playwright chromium v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip[22m
+Error: Download failed: server returned code 403 body 'Forbidden'. URL: https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip
+    at IncomingMessage.handleError (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:28089:23)
+    at IncomingMessage.emit (node:events:521:24)
+    at endReadableNT (node:internal/streams/readable:1729:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Downloading Chrome for Testing 148.0.7778.96 (playwright chromium v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip[22m
+Error: Download failed: server returned code 403 body 'Forbidden'. URL: https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip
+    at IncomingMessage.handleError (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:28089:23)
+    at IncomingMessage.emit (node:events:521:24)
+    at endReadableNT (node:internal/streams/readable:1729:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Downloading Chrome for Testing 148.0.7778.96 (playwright chromium v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip[22m
+Error: Download failed: server returned code 403 body 'Forbidden'. URL: https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip
+    at IncomingMessage.handleError (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:28089:23)
+    at IncomingMessage.emit (node:events:521:24)
+    at endReadableNT (node:internal/streams/readable:1729:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Downloading Chrome for Testing 148.0.7778.96 (playwright chromium v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip[22m
+Error: Download failed: server returned code 403 body 'Forbidden'. URL: https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip
+    at IncomingMessage.handleError (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:28089:23)
+    at IncomingMessage.emit (node:events:521:24)
+    at endReadableNT (node:internal/streams/readable:1729:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Downloading Chrome for Testing 148.0.7778.96 (playwright chromium v1223)[2m from https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip[22m
+Error: Download failed: server returned code 403 body 'Forbidden'. URL: https://cdn.playwright.dev/builds/cft/148.0.7778.96/linux64/chrome-linux64.zip
+    at IncomingMessage.handleError (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:28089:23)
+    at IncomingMessage.emit (node:events:521:24)
+    at endReadableNT (node:internal/streams/readable:1729:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+Failed to install browsers
+Error: Failed to download Chrome for Testing 148.0.7778.96 (playwright chromium v1223), caused by
+Error: Download failure, code=1
+    at ChildProcess.<anonymous> (/workspace/REALCHASE/node_modules/playwright-core/lib/coreBundle.js:27967:32)
+    at ChildProcess.emit (node:events:509:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:295:12)

@@ -1,4 +1,3 @@
-import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 
@@ -31,7 +30,7 @@ export function StatusBar() {
             background: warn ? 'var(--status-warn)' : 'var(--status-ok)',
           }}
         />
-        Project Status: {warn ? 'Performance Limited' : 'Ready'}
+        Engine Status: {state.engineReady ? (warn ? 'Performance Limited' : 'Running') : 'Starting'}
       </span>
 
       <span className="mono" style={{ flex: 1, textAlign: 'center' }}>
@@ -39,13 +38,7 @@ export function StatusBar() {
       </span>
 
       <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span>Auto Save: {state.autosaveMinutes} min ago</span>
-        <button
-          onClick={() => dispatch({ type: 'TOGGLE_BACKUP' })}
-          style={{ color: state.backupEnabled ? 'var(--status-ok)' : 'var(--text-muted)' }}
-        >
-          Backup: {state.backupEnabled ? 'On' : 'Off'}
-        </button>
+        <span>Autosave/backup disabled until persistent project service is scheduled</span>
         {state.activeModule === 'settings' ? (
           <>
             <Button variant="secondary" style={{ height: 18, fontSize: 9 }} onClick={() => dispatch({ type: 'TOGGLE_COMPACT' })}>
@@ -56,13 +49,7 @@ export function StatusBar() {
             </Button>
           </>
         ) : (
-          <Button
-            variant="ghost"
-            style={{ height: 18, fontSize: 9, gap: 4 }}
-            onClick={() => dispatch({ type: 'SHOW_TOAST', message: 'Live chat panel — coming soon' })}
-          >
-            <MessageSquare size={12} /> Live Chat
-          </Button>
+          <Button variant="ghost" style={{ height: 18, fontSize: 9, gap: 4 }} disabled title="Live chat requires a streaming/output service">Live Chat · Not wired</Button>
         )}
       </span>
     </footer>

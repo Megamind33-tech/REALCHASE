@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Search, Filter, ChevronLeft, Box, Monitor, Lamp, Circle, Leaf, Armchair } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
@@ -19,26 +18,9 @@ const objectIcons: Record<string, typeof Box> = {
 
 export function AssetPanel() {
   const { state, dispatch } = useShell();
-  const { addObject, loadPack, importGltfFiles } = useEditorBridge();
-  const [loadingPackId, setLoadingPackId] = useState<string | null>(null);
-  const [loadProgress, setLoadProgress] = useState(0);
+  const { addObject, importGltfFiles } = useEditorBridge();
 
-  const handlePackLoad = async (packId: string, packName: string) => {
-    setLoadingPackId(packId);
-    setLoadProgress(0);
-    try {
-      const count = await loadPack(packId, setLoadProgress);
-      dispatch({ type: 'SHOW_TOAST', message: `${packName} loaded (${count} nodes)` });
-    } catch {
-      dispatch({
-        type: 'SHOW_TOAST',
-        message: `Pack unavailable: add public/scenes/${packId}/scene.babylon`,
-      });
-    } finally {
-      setLoadingPackId(null);
-      setLoadProgress(0);
-    }
-  };
+
 
   const handleAssetDrop = async (files: File[]) => {
     try {
@@ -142,27 +124,28 @@ export function AssetPanel() {
 
         {state.assetTab === 'sets' && (
           <>
-            <div className="section-label" style={{ marginBottom: 6 }}>Premium Studio Packs</div>
+            <div className="section-label" style={{ marginBottom: 6 }}>Studio Packs · Not available in this build</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)', lineHeight: 1.45, marginBottom: 8 }}>Pack loading expects <span className="mono">public/scenes/&lt;pack-id&gt;/scene.babylon</span>. No packaged scene files are present, so pack actions are disabled instead of pretending to load.</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 16 }}>
               {filteredPacks.map((pack) => (
                 <button
                   key={pack.id}
-                  disabled={loadingPackId !== null}
-                  onClick={() => void handlePackLoad(pack.id, pack.name)}
+                  disabled
+                  title={`Pack unavailable: add public/scenes/${pack.id}/scene.babylon`}
                   style={{
                     aspectRatio: '16/10',
-                    background: pack.accent,
+                    background: 'var(--bg-panel-raised)',
                     border: '1px solid var(--border-subtle)',
                     borderRadius: 3,
                     padding: 4,
                     textAlign: 'left',
                     fontSize: 9,
-                    color: '#fff',
+                    color: 'var(--text-muted)',
                   }}
                 >
-                  {loadingPackId === pack.id
-                    ? `Loading ${Math.round(loadProgress * 100)}%`
-                    : pack.name}
+                  {pack.name}
+                  <br />
+                  <span style={{ fontSize: 8 }}>Requires scene.babylon</span>
                 </button>
               ))}
             </div>

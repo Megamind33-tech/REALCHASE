@@ -96,9 +96,9 @@ function shellReducer(state: ShellState, action: ShellAction): ShellState {
     case 'SET_ASSET_SEARCH':
       return { ...state, assetSearch: action.value };
     case 'TOGGLE_REC':
-      return { ...state, isRecording: !state.isRecording, toast: !state.isRecording ? 'Recording started' : 'Recording stopped' };
+      return { ...state, isRecording: false, toast: 'Recording disabled until real recording engine is added' };
     case 'TOGGLE_LIVE':
-      return { ...state, isLive: !state.isLive, toast: !state.isLive ? 'Output armed — confirm destinations' : 'Live output stopped' };
+      return { ...state, isLive: false, toast: 'Streaming disabled until MediaMTX/output pipeline is added' };
     case 'TOGGLE_SAFE_AREA':
       return { ...state, showSafeArea: !state.showSafeArea };
     case 'SET_VIEWPORT_MODE':

@@ -44,7 +44,7 @@ export function Viewport() {
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-viewport)' }}>
+    <div data-testid="builder-surface" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, background: 'var(--bg-viewport)' }}>
       <div
         style={{
           height: 32,
@@ -178,28 +178,6 @@ export function Viewport() {
             <Button variant="ghost" onClick={() => dispatch({ type: 'DISMISS_PERFORMANCE_WARNING' })} style={{ height: 20, fontSize: 9 }}>
               Dismiss
             </Button>
-          </div>
-        )}
-
-        {state.isLive && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              zIndex: 60,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'rgba(220, 38, 38, 0.9)',
-              padding: '2px 8px',
-              borderRadius: 3,
-              fontSize: 10,
-              fontWeight: 600,
-            }}
-          >
-            <span className="rec-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
-            LIVE
           </div>
         )}
 

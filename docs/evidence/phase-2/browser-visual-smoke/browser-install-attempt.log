@@ -1,0 +1,11 @@
+Command attempted: apt-get update && apt-get install -y chromium
+Result: failed before install because the container's apt proxy returned HTTP 403 for Ubuntu package repositories and third-party repositories.
+Relevant errors:
+- http://security.ubuntu.com/ubuntu noble-security InRelease: 403 Forbidden
+- http://archive.ubuntu.com/ubuntu noble InRelease: 403 Forbidden
+- http://archive.ubuntu.com/ubuntu noble-updates InRelease: 403 Forbidden
+- http://archive.ubuntu.com/ubuntu noble-backports InRelease: 403 Forbidden
+- https://apt.llvm.org/noble llvm-toolchain-noble-20 InRelease: proxy HTTP 403 Forbidden
+- https://mise.jdx.dev/deb stable InRelease: proxy HTTP 403 Forbidden
+
+Because Playwright browser download also fails in this environment and no system browser executable exists, the browser visual smoke test cannot capture real screenshots in this container. No placeholder screenshots were created.

@@ -1,21 +1,14 @@
-import { useState } from 'react';
-import { Slider, Meter } from '@/components/ui/Controls';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
-import { TRANSITIONS, STREAM_DESTINATIONS, AUDIO_CHANNELS } from '@/data/mock/studioData';
-import type { AudioChannel } from '@/context/shellTypes';
+import { TRANSITIONS, STREAM_DESTINATIONS } from '@/data/mock/studioData';
 
 export function OutputPanel() {
-  const { state, dispatch } = useShell();
-  // Mute/solo are real UI state, but there is no audio device yet, so meters are
-  // held at idle (0) rather than animated with fake levels. Live metering lands
-  // with the Phase 2 audio pipeline.
-  const [channels, setChannels] = useState<AudioChannel[]>(AUDIO_CHANNELS);
-
+  const { state } = useShell();
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
   return (
     <div
+      data-testid="outputs-surface"
       style={{
         height: 'var(--output-panel-h)',
         borderTop: '1px solid var(--border-subtle)',
@@ -30,76 +23,37 @@ export function OutputPanel() {
           {TRANSITIONS.map((t) => (
             <button
               key={t}
-              onClick={() => dispatch({ type: 'SET_TRANSITION', transition: t })}
+              disabled title="Transitions disabled until real output pipeline"
               style={{
                 padding: '4px 6px',
                 fontSize: 9,
-                border: `1px solid ${state.transitionType === t ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                border: '1px solid var(--border-subtle)',
                 borderRadius: 3,
-                background: state.transitionType === t ? 'var(--accent-blue-dim)' : 'var(--bg-panel-raised)',
-                color: state.transitionType === t ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                background: 'var(--bg-panel-raised)',
+                color: 'var(--text-muted)',
+                opacity: 0.55,
               }}
             >
               {t}
             </button>
           ))}
         </div>
-        <Slider
-          label="Duration"
-          value={Math.round(state.transitionDuration * 10)}
-          min={1}
-          max={30}
-          unit=" (×0.1s)"
-          onChange={(v) => dispatch({ type: 'SET_TRANSITION_DURATION', duration: v / 10 })}
-        />
+        <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 8 }}>Transitions disabled until real output pipeline.</div>
 
-        <div className="section-label" style={{ margin: '12px 0 4px' }}>Audio Mixer</div>
-        <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 6 }}>
-          No audio device connected — live levels arrive in Phase 2.
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', marginBottom: 12 }}>
-          {channels.map((ch) => (
-            <div key={ch.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <Meter level={0} muted={ch.muted} />
-              <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{ch.label}</span>
-              <div style={{ display: 'flex', gap: 2 }}>
-                <button
-                  onClick={() =>
-                    setChannels((prev) =>
-                      prev.map((c) => (c.id === ch.id ? { ...c, muted: !c.muted } : c)),
-                    )
-                  }
-                  style={{
-                    fontSize: 8,
-                    padding: '1px 4px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
-                    background: ch.muted ? 'var(--status-error)' : 'transparent',
-                    color: ch.muted ? '#fff' : 'var(--text-muted)',
-                  }}
-                >
-                  M
-                </button>
-                <button
-                  onClick={() =>
-                    setChannels((prev) =>
-                      prev.map((c) => ({ ...c, solo: c.id === ch.id ? !c.solo : false })),
-                    )
-                  }
-                  style={{
-                    fontSize: 8,
-                    padding: '1px 4px',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 2,
-                    background: ch.solo ? 'var(--status-warn)' : 'transparent',
-                    color: ch.solo ? '#000' : 'var(--text-muted)',
-                  }}
-                >
-                  S
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="section-label" style={{ margin: '12px 0 4px' }}>Audio</div>
+        <div
+          data-testid="audio-meter-panel"
+          style={{
+            border: '1px dashed var(--border-active)',
+            borderRadius: 3,
+            padding: 12,
+            color: 'var(--text-muted)',
+            fontSize: 10,
+            lineHeight: 1.5,
+            marginBottom: 12,
+          }}
+        >
+          No real audio source connected. Audio engine and source audio analysis are not wired yet, so meters and routing controls are hidden instead of showing fake levels.
         </div>
 
         <div className="section-label" style={{ marginBottom: 6 }}>Output &amp; Stream</div>
@@ -115,9 +69,7 @@ export function OutputPanel() {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>REC</div>
-            <div className="mono" style={{ color: state.isRecording ? 'var(--status-rec)' : 'var(--text-primary)' }}>
-              {state.isRecording ? 'Armed' : 'Standby'}
-            </div>
+            <div className="mono" style={{ color: 'var(--text-muted)' }}>Requires recording engine</div>
             <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Recorder not connected (Phase 2)</div>
           </div>
           <div
@@ -131,22 +83,21 @@ export function OutputPanel() {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Program Monitor</div>
-            <div style={{ color: state.isLive ? 'var(--status-warn)' : 'var(--text-muted)' }}>
-              {state.isLive ? 'Armed' : 'Offline'}
-            </div>
+            <div style={{ color: 'var(--text-muted)' }}>Requires streaming engine</div>
             <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Output not connected (Phase 2)</div>
             <Button
               variant="secondary"
               style={{ marginTop: 4, height: 20, fontSize: 9, width: '100%' }}
-              onClick={() => dispatch({ type: 'SET_MODULE', module: 'outputs' })}
+              disabled title="Disabled until real output pipeline"
             >
               Manage Destinations
             </Button>
           </div>
         </div>
 
-        <div className="section-label" style={{ marginBottom: 4 }}>Stream Health</div>
-        {STREAM_DESTINATIONS.map((dest) => (
+        <div data-testid="stream-destination-panel">
+          <div className="section-label" style={{ marginBottom: 4 }}>Stream Destinations</div>
+          {STREAM_DESTINATIONS.map((dest) => (
           <div
             key={dest.id}
             style={{
@@ -159,9 +110,10 @@ export function OutputPanel() {
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>{dest.name}</span>
-            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Not connected</span>
+            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Streaming disabled until MediaMTX/output pipeline is added</span>
           </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

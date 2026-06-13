@@ -1,0 +1,8 @@
+ M src/components/shell/AssetPanel.tsx
+ M src/components/shell/CameraStrip.tsx
+ M src/components/shell/OutputPanel.tsx
+ M src/components/shell/StatusBar.tsx
+ M src/components/shell/SwitcherPanel.tsx
+ M src/components/shell/Viewport.tsx
+ M src/context/ShellContext.tsx
+?? docs/evidence/phase-2/demo-removal-outputs-audio-settings/

@@ -1,0 +1,1 @@
+No generic lint script is configured in package.json. Targeted smoke scripts are test:anti-demo and test:visual-smoke.

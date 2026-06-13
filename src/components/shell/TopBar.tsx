@@ -1,12 +1,40 @@
+import { useRef } from 'react';
 import {
   Save, FolderOpen, FilePlus, Upload, Undo2, Redo2, Circle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
+import { useSources } from '@/context/SourcesContext';
+import { buildProjectFile, parseProjectFile, saveProjectFile } from '@/projectPersistence';
 
 export function TopBar() {
   const { state, dispatch } = useShell();
+  const { sources, previewId, programId, restoreProjectSources } = useSources();
+  const openRef = useRef<HTMLInputElement>(null);
   const { metrics } = state;
+
+  const saveProject = async () => {
+    try {
+      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId));
+      dispatch({ type: 'SHOW_TOAST', message: path === 'cancelled' ? 'Save Project cancelled' : `Saved project: ${path}` });
+    } catch (error) {
+      dispatch({ type: 'SHOW_TOAST', message: `Save Project failed: ${error instanceof Error ? error.message : 'unknown error'}` });
+    }
+  };
+
+  const openProject = async (file: File | null | undefined) => {
+    if (!file) {
+      dispatch({ type: 'SHOW_TOAST', message: 'Open Project cancelled' });
+      return;
+    }
+    try {
+      const restored = parseProjectFile(await file.text());
+      restoreProjectSources(restored.sources, restored.previewId, restored.programId);
+      dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}. Live sources need reconnection.` });
+    } catch (error) {
+      dispatch({ type: 'SHOW_TOAST', message: `Open Project failed: ${error instanceof Error ? error.message : 'invalid file'}` });
+    }
+  };
 
   return (
     <header
@@ -38,8 +66,9 @@ export function TopBar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'Save' })}><Save size={14} /> Save</Button>
-        <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'Open' })}><FolderOpen size={14} /> Open</Button>
+        <Button onClick={() => void saveProject()}><Save size={14} /> Save Project</Button>
+        <Button onClick={() => openRef.current?.click()}><FolderOpen size={14} /> Open Project</Button>
+        <input ref={openRef} type="file" accept=".chaseproj,application/json" hidden onChange={(e) => void openProject(e.currentTarget.files?.[0])} />
         <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'New' })}><FilePlus size={14} /> New</Button>
         <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'Import' })}><Upload size={14} /> Import</Button>
       </div>
@@ -73,14 +102,13 @@ export function TopBar() {
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* Disabled until a real recorder/output pipeline exists — operator
-            safety: never show REC/LIVE unless something real is happening. */}
-        <Button variant="secondary" disabled title="Recorder not wired yet">
+        {/* Disabled until a real recorder/output pipeline exists. */}
+        <Button data-testid="record-status" variant="secondary" disabled title="Recorder not wired yet">
           <Circle size={10} fill="var(--status-rec)" />
-          REC
+          REC · Requires recording engine
         </Button>
-        <Button variant="secondary" disabled title="Live output not wired yet">
-          GO LIVE
+        <Button data-testid="live-status" variant="secondary" disabled title="Live output not wired yet">
+          GO LIVE · Requires streaming engine
         </Button>
       </div>
     </header>

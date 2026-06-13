@@ -1,0 +1,1 @@
+No generic lint/test script is configured in package.json; targeted anti-demo smoke runs via npm run test:anti-demo.

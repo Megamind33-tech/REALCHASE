@@ -66,7 +66,7 @@ export function Timeline() {
               ))}
             </div>
             <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
-              Transition {state.transitionDuration}s
+              Transitions · Not wired yet
             </span>
           </>
         )}
@@ -160,19 +160,19 @@ export function Timeline() {
               gap: 4,
             }}
           >
-            <IconButton label="Jump to start"><SkipBack size={14} /></IconButton>
-            <IconButton label={state.isPlaying ? 'Pause' : 'Play'} onClick={() => dispatch({ type: 'TOGGLE_PLAYBACK' })}>
+            <IconButton label="Jump to start — not wired yet" disabled><SkipBack size={14} /></IconButton>
+            <IconButton label="Timeline transport — not wired yet" disabled>
               {state.isPlaying ? <Pause size={14} /> : <Play size={14} />}
             </IconButton>
-            <IconButton label="Next"><SkipForward size={14} /></IconButton>
-            <IconButton label="Record cue" onClick={() => dispatch({ type: 'SHOW_TOAST', message: 'Record cue marked' })}>
+            <IconButton label="Next — not wired yet" disabled><SkipForward size={14} /></IconButton>
+            <IconButton label="Record cue — requires recording engine" disabled>
               <Circle size={14} />
             </IconButton>
-            <IconButton label="Loop"><Repeat size={14} /></IconButton>
+            <IconButton label="Loop — not wired yet" disabled><Repeat size={14} /></IconButton>
 
             <div style={{ flex: 1 }} />
 
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', marginRight: 4 }}>Zoom</span>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)', marginRight: 4 }}>Timeline transport disabled until real playback/editing</span>
             <input
               type="range"
               min={50}

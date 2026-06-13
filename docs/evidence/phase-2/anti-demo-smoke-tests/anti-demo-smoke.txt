@@ -1,0 +1,9 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> chase-studio-pro@0.1.0 test:anti-demo
+> node tests/anti-demo-smoke.mjs
+
+anti-demo smoke passed
+covered builder: src/components/shell/Viewport.tsx, src/components/shell/TopBar.tsx, src/components/shell/StatusBar.tsx
+covered switcher: src/components/shell/SwitcherPanel.tsx, src/components/shell/TopBar.tsx, src/components/shell/StatusBar.tsx
+covered outputs: src/components/shell/OutputPanel.tsx, src/components/shell/TopBar.tsx, src/components/shell/StatusBar.tsx
