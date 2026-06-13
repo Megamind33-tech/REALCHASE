@@ -1,0 +1,1 @@
+Attempted app-launch screenshot with Playwright after launching Vite dev server. The dev server returned HTTP 200, but this container has no installed browser executable and `npx playwright install chromium` failed with HTTP 403 from the browser CDN. See playwright-install.txt. No screenshot was fabricated.

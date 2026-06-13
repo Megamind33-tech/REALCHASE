@@ -1,0 +1,7 @@
+ M package.json
+ M src/components/shell/OutputPanel.tsx
+ M src/components/shell/SwitcherPanel.tsx
+ M src/components/shell/TopBar.tsx
+ M src/components/shell/Viewport.tsx
+?? docs/evidence/phase-2/anti-demo-smoke-tests/
+?? tests/

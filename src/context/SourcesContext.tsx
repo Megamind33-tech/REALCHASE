@@ -9,7 +9,10 @@ import {
 } from 'react';
 import { useEditorBridge } from './EditorBridgeContext';
 import {
+  DEFAULT_KEYING_SETTINGS,
   describeMediaError,
+  type KeyingSettings,
+  type PlacementMode,
   type Source,
   type SourceRole,
 } from '@/sources/sourceTypes';
@@ -25,7 +28,8 @@ type SourcesAction =
   | { type: 'PATCH'; id: string; patch: Partial<Source> }
   | { type: 'REMOVE'; id: string }
   | { type: 'SET_PREVIEW'; id: string | null }
-  | { type: 'SET_PROGRAM'; id: string | null };
+  | { type: 'SET_PROGRAM'; id: string | null }
+  | { type: 'RESTORE'; sources: Source[]; previewId: string | null; programId: string | null };
 
 const initialState: SourcesState = { sources: [], previewId: null, programId: null };
 
@@ -49,6 +53,8 @@ function reducer(state: SourcesState, action: SourcesAction): SourcesState {
       return { ...state, previewId: action.id };
     case 'SET_PROGRAM':
       return { ...state, programId: action.id };
+    case 'RESTORE':
+      return { sources: action.sources, previewId: action.previewId, programId: action.programId };
     default:
       return state;
   }
@@ -64,6 +70,9 @@ interface SourcesValue {
   removeSource: (id: string) => void;
   setPreview: (id: string | null) => void;
   cut: () => void;
+  updateSourcePlacement: (id: string, placement: PlacementMode, screenTargetId?: string) => void;
+  updateSourceKeying: (id: string, keying: KeyingSettings) => void;
+  restoreProjectSources: (sources: Source[], previewId: string | null, programId: string | null) => void;
   roleOf: (id: string) => SourceRole;
 }
 
@@ -95,8 +104,8 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   // studio viewport — or clear it when Program is empty.
   useEffect(() => {
     if (!engine) return;
-    engine.setProgramStream(programSource?.stream ?? null, programSource?.placement ?? 'mediaPlane');
-  }, [engine, programSource?.id, programSource?.stream, programSource?.placement]);
+    engine.setProgramStream(programSource?.stream ?? null, programSource?.placement ?? 'mediaPlane', programSource?.screenTargetId, programSource?.keying);
+  }, [engine, programSource?.id, programSource?.stream, programSource?.placement, programSource?.screenTargetId, programSource?.keying]);
 
   // Stop all camera tracks when the app unmounts — no background cameras left on.
   useEffect(() => {
@@ -117,6 +126,8 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
       stream: null,
       error: null,
       placement: 'mediaPlane',
+      screenTargetId: 'led-main',
+      keying: DEFAULT_KEYING_SETTINGS,
     };
     dispatch({ type: 'ADD', source });
 
@@ -154,6 +165,19 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_PROGRAM', id: sourcesRef.current.length ? state.previewId : null });
   }, [state.previewId]);
 
+  const updateSourcePlacement = useCallback((id: string, placement: PlacementMode, screenTargetId = 'led-main') => {
+    dispatch({ type: 'PATCH', id, patch: { placement, screenTargetId } });
+  }, []);
+
+  const updateSourceKeying = useCallback((id: string, keying: KeyingSettings) => {
+    dispatch({ type: 'PATCH', id, patch: { keying } });
+  }, []);
+
+  const restoreProjectSources = useCallback((sources: Source[], previewId: string | null, programId: string | null) => {
+    sourcesRef.current.forEach((s) => stopStream(s.stream));
+    dispatch({ type: 'RESTORE', sources, previewId, programId });
+  }, []);
+
   const roleOf = useCallback(
     (id: string): SourceRole => {
       const isPreview = state.previewId === id;
@@ -176,6 +200,9 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     removeSource,
     setPreview,
     cut,
+    updateSourcePlacement,
+    updateSourceKeying,
+    restoreProjectSources,
     roleOf,
   };
 

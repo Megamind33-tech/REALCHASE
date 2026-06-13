@@ -22,8 +22,26 @@ export type SourceStatus = 'idle' | 'connecting' | 'live' | 'error';
  */
 export type PlacementMode = 'mediaPlane' | 'screenInsert' | 'presenterPlate' | 'backgroundPlate';
 
+export type KeyingMode = 'disabled' | 'chromaKey' | 'alpha';
+
+export interface KeyingSettings {
+  mode: KeyingMode;
+  keyColor: string;
+  similarity: number;
+  smoothness: number;
+  opacity: number;
+}
+
+export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
+  mode: 'disabled',
+  keyColor: '#00ff00',
+  similarity: 0.32,
+  smoothness: 0.08,
+  opacity: 1,
+};
+
 /** Placement modes actually wired in this phase. */
-export const IMPLEMENTED_PLACEMENT_MODES: readonly PlacementMode[] = ['mediaPlane'];
+export const IMPLEMENTED_PLACEMENT_MODES: readonly PlacementMode[] = ['mediaPlane', 'screenInsert', 'presenterPlate'];
 
 export interface Source {
   id: string;
@@ -37,6 +55,12 @@ export interface Source {
   error: string | null;
   /** How this source is placed when it is the Program output. */
   placement: PlacementMode;
+  /** Screen mesh chaseId used when placement === screenInsert. */
+  screenTargetId?: string;
+  /** Real shader parameters used when placement === presenterPlate. */
+  keying?: KeyingSettings;
+  /** Set on restored live inputs because MediaStream objects are intentionally not serialized. */
+  needsReconnect?: boolean;
 }
 
 /** Which switcher bus a source is currently assigned to (derived, not stored per-source). */

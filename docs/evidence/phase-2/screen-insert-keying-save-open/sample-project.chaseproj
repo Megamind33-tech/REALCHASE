@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "projectName": "Untitled CHASE Project",
+  "createdAt": "2026-06-13T00:00:00.000Z",
+  "updatedAt": "2026-06-13T00:00:00.000Z",
+  "scene": { "activeSetId": "default-studio", "cameraView": "cam1", "placements": [] },
+  "sources": [],
+  "programSourceId": null,
+  "previewSourceId": null,
+  "keying": {},
+  "ui": {}
+}

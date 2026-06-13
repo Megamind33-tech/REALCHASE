@@ -31,7 +31,7 @@ import { QUALITY_PROFILES } from './qualityProfile';
 import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sceneRegistry';
 import { LAYER_TO_OBJECT } from './sceneRegistry';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
-import type { PlacementMode } from '@/sources/sourceTypes';
+import { DEFAULT_KEYING_SETTINGS, type KeyingSettings, type PlacementMode } from '@/sources/sourceTypes';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -53,7 +53,7 @@ function registerMediaShader() {
   Effect.ShadersStore[`${MEDIA_SHADER}VertexShader`] =
     'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; void main(){ vUv = uv; gl_Position = worldViewProjection * vec4(position, 1.0); }';
   Effect.ShadersStore[`${MEDIA_SHADER}FragmentShader`] =
-    'precision highp float; varying vec2 vUv; uniform sampler2D videoSampler; void main(){ gl_FragColor = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y)); }';
+    'precision highp float; varying vec2 vUv; uniform sampler2D videoSampler; uniform int keyMode; uniform vec3 keyColor; uniform float similarity; uniform float smoothness; uniform float opacity; void main(){ vec4 c = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y)); float a = c.a; if(keyMode == 1){ float d = distance(c.rgb, keyColor); a *= smoothstep(similarity, similarity + smoothness, d); } if(keyMode == 2){ a = c.a; } gl_FragColor = vec4(c.rgb, a * opacity); }';
   mediaShaderRegistered = true;
 }
 
@@ -79,6 +79,8 @@ export class StudioEngine {
   private programPlane: Mesh | null = null;
   private programTexture: VideoTexture | null = null;
   private programVideoEl: HTMLVideoElement | null = null;
+  private programPlacement: PlacementMode = 'mediaPlane';
+  private screenInsertTargets = new Set(['led-main', 'led-side', 'desk-screen', 'screen-insert-test']);
 
   init(canvas: HTMLCanvasElement) {
     if (this.engine) return;
@@ -430,13 +432,20 @@ export class StudioEngine {
    * Only `mediaPlane` is implemented in this slice; other placement modes fall
    * back to it until they are wired.
    */
-  setProgramStream(stream: MediaStream | null, placement: PlacementMode = 'mediaPlane') {
+  setProgramStream(
+    stream: MediaStream | null,
+    placement: PlacementMode = 'mediaPlane',
+    screenTargetId = 'led-main',
+    keying: KeyingSettings = DEFAULT_KEYING_SETTINGS,
+  ) {
     if (!this.scene) return;
     if (!stream) {
       this.clearProgramMedia();
       return;
     }
-    void placement; // screenInsert/presenterPlate/backgroundPlate not wired yet
+    this.programPlacement = placement;
+    if (placement === 'screenInsert' && !this.screenInsertTargets.has(screenTargetId)) screenTargetId = 'screen-insert-test';
+    if (placement === 'screenInsert') this.ensureScreenInsertTarget(screenTargetId);
 
     if (!this.programVideoEl) {
       const video = document.createElement('video');
@@ -471,7 +480,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection'], samplers: ['videoSampler'] },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'opacity'], samplers: ['videoSampler'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -482,6 +491,11 @@ export class StudioEngine {
       plane.edgesColor = new Color4(0.23, 0.51, 0.96, 1);
 
       plane.metadata = { chaseId: 'program-media', displayName: 'Program Media' };
+      mat.setInt('keyMode', 0);
+      mat.setVector3('keyColor', new Vector3(0, 1, 0));
+      mat.setFloat('similarity', 0.32);
+      mat.setFloat('smoothness', 0.08);
+      mat.setFloat('opacity', 1);
       this.programPlane = plane;
     }
 
@@ -493,11 +507,14 @@ export class StudioEngine {
       // Canonical live-video integration: a Babylon VideoTexture bound to the
       // managed <video>. Frames are pushed each render tick (see render loop).
       const tex = new VideoTexture('programFeed', this.programVideoEl, this.scene, false, true);
-      (this.programPlane.material as ShaderMaterial).setTexture('videoSampler', tex);
+      const mat = this.programPlane.material as ShaderMaterial;
+      mat.setTexture('videoSampler', tex);
+      this.applyProgramPlacement(placement, screenTargetId, w / h);
+      this.applyKeying(mat, keying, placement);
       this.programTexture = tex;
       // Preserve the source aspect ratio so faces/bodies are never deformed.
-      const height = 2;
-      this.programPlane.scaling = new Vector3((w / h) * height, height, 1);
+      const height = placement === 'screenInsert' ? 1 : 2;
+      if (placement !== 'screenInsert') this.programPlane.scaling = new Vector3((w / h) * height, height, 1);
     };
 
     const video = this.programVideoEl;
@@ -506,6 +523,49 @@ export class StudioEngine {
 
     this.emitSceneGraph();
     this.selectObject('program-media'); // surface placement handles immediately
+  }
+
+  private ensureScreenInsertTarget(id: string) {
+    if (!this.scene || this.findMeshById(id)) return;
+    const mesh = MeshBuilder.CreatePlane('screenInsertTestTarget', { width: 3.2, height: 1.8 }, this.scene);
+    mesh.position.set(3.2, 2.2, 3.8);
+    mesh.rotation.y = Math.PI;
+    const mat = new StandardMaterial('screenInsertTestTargetMat', this.scene);
+    mat.emissiveColor = new Color3(0.02, 0.08, 0.18);
+    mat.diffuseColor = new Color3(0.02, 0.04, 0.08);
+    mesh.material = mat;
+    mesh.metadata = { chaseId: id, displayName: 'Editable Screen Insert Target', screenInsertTarget: true };
+    mesh.parent = this.refs?.environmentRoot ?? null;
+    this.emitSceneGraph();
+  }
+
+  private applyProgramPlacement(placement: PlacementMode, screenTargetId: string, aspect: number) {
+    if (!this.programPlane) return;
+    this.programPlane.parent = null;
+    if (placement === 'screenInsert') {
+      const target = this.findMeshById(screenTargetId);
+      if (target instanceof Mesh) {
+        this.programPlane.position.copyFrom(target.getAbsolutePosition());
+        this.programPlane.rotation.copyFrom(target.rotation);
+        this.programPlane.scaling = new Vector3(aspect * 1.2, 1.2, 1);
+        this.programPlane.metadata = { chaseId: 'program-media', displayName: `Program Media → ${target.metadata?.displayName ?? screenTargetId}`, screenInsertTargetId: screenTargetId };
+        return;
+      }
+    }
+    this.programPlane.position = placement === 'presenterPlate' ? new Vector3(0, 1.8, 0.2) : new Vector3(0, 2.6, 3.2);
+    this.programPlane.rotation.set(0, Math.PI, 0);
+    this.programPlane.metadata = { chaseId: 'program-media', displayName: placement === 'presenterPlate' ? 'Presenter Plate' : 'Program Media', placement: this.programPlacement };
+  }
+
+  private applyKeying(mat: ShaderMaterial, keying: KeyingSettings, placement: PlacementMode) {
+    const mode = placement === 'presenterPlate' ? keying.mode : 'disabled';
+    mat.setInt('keyMode', mode === 'chromaKey' ? 1 : mode === 'alpha' ? 2 : 0);
+    const color = Color3.FromHexString(keying.keyColor || '#00ff00');
+    mat.setVector3('keyColor', new Vector3(color.r, color.g, color.b));
+    mat.setFloat('similarity', keying.similarity);
+    mat.setFloat('smoothness', keying.smoothness);
+    mat.setFloat('opacity', keying.opacity);
+    mat.needAlphaBlending = () => mode !== 'disabled' || keying.opacity < 1;
   }
 
   private clearProgramMedia() {
@@ -532,7 +592,7 @@ export class StudioEngine {
     const nodes = new Map<string, SceneNodeInfo>();
     this.scene.meshes.forEach((m) => {
       const id = m.metadata?.chaseId as string | undefined;
-      if (id && m.name && id !== 'desk-screen' && m.isEnabled(true)) {
+      if (id && m.name && m.isEnabled(true)) {
         nodes.set(id, { id, name: m.metadata.displayName ?? m.name, type: 'mesh' });
       }
     });

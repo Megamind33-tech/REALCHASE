@@ -1,0 +1,10 @@
+ M docs/evidence/phase-2/DEMO_REMOVAL_AUDIT.md
+ M src/components/shell/OutputPanel.tsx
+ M src/components/shell/SwitcherPanel.tsx
+ M src/components/shell/Timeline.tsx
+ M src/components/shell/TopBar.tsx
+ M src/context/SourcesContext.tsx
+ M src/engine/StudioEngine.ts
+ M src/sources/sourceTypes.ts
+?? docs/evidence/phase-2/screen-insert-keying-save-open/
+?? src/projectPersistence.ts

@@ -1,4 +1,4 @@
-import { Plus, Video } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { CAMERA_SHOTS } from '@/data/mock/studioData';
 
@@ -53,8 +53,9 @@ export function CameraStrip() {
               }}
             >
               {/* 3D viewport angle, not a live feed — no fake thumbnail preview. */}
-              <Video size={16} />
+              <Eye size={16} />
               <span style={{ fontSize: 8 }}>{cam.shortLabel}</span>
+              <span style={{ fontSize: 7 }}>Viewpoint</span>
             </div>
             <span
               style={{
@@ -71,7 +72,7 @@ export function CameraStrip() {
       })}
 
       <button
-        onClick={() => dispatch({ type: 'SHOW_TOAST', message: 'Add camera — editor integration pending' })}
+        disabled title="3D viewpoint creation is not wired yet"
         style={{
           flexShrink: 0,
           width: 72,
@@ -87,8 +88,8 @@ export function CameraStrip() {
           fontSize: 9,
         }}
       >
-        <Plus size={16} />
-        Add Camera
+        <Eye size={16} />
+        Add Viewpoint · Not wired
       </button>
     </div>
   );
