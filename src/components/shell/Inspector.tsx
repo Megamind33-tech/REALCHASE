@@ -22,7 +22,7 @@ export function Inspector() {
   const { state, dispatch } = useShell();
   const sceneNodes = useSceneNodes();
 
-  if (state.rightPanelCollapsed || state.activeModule === 'settings') return null;
+  if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
   const { desk } = state;
 
@@ -168,34 +168,13 @@ export function Inspector() {
               </>
             )}
 
-            {state.inspectorSubTab === 'light' && (
-              <>
-                <Slider label="Key Intensity" value={85} onChange={() => dispatch({ type: 'SHOW_TOAST', message: 'Light updated' })} />
-                <Slider label="Fill Ratio" value={45} onChange={() => dispatch({ type: 'SHOW_TOAST', message: 'Fill updated' })} />
-                <Slider label="Rim Intensity" value={60} onChange={() => dispatch({ type: 'SHOW_TOAST', message: 'Rim updated' })} />
-              </>
-            )}
+            {state.inspectorSubTab === 'light' && <NotWired feature="Studio lighting controls" />}
 
-            {state.inspectorSubTab === 'presenter' && (
-              <>
-                <Slider label="Skin Smoothing" value={desk.skinSmoothing} unit="%" onChange={(v) => dispatch({ type: 'UPDATE_DESK', patch: { skinSmoothing: v } })} />
-                <Slider label="Eye Brightness" value={desk.eyeBrightness} unit="%" onChange={(v) => dispatch({ type: 'UPDATE_DESK', patch: { eyeBrightness: v } })} />
-                <Slider label="Teeth Whitening" value={desk.teethWhitening} unit="%" onChange={(v) => dispatch({ type: 'UPDATE_DESK', patch: { teethWhitening: v } })} />
-              </>
-            )}
+            {state.inspectorSubTab === 'presenter' && <NotWired feature="Presenter / talent adjustments" />}
 
-            {state.inspectorSubTab === 'keying' && (
-              <>
-                <Slider label="Spill Suppression" value={40} onChange={() => dispatch({ type: 'SHOW_TOAST', message: 'Keying updated' })} />
-                <Slider label="Tolerance" value={25} onChange={() => dispatch({ type: 'SHOW_TOAST', message: 'Tolerance updated' })} />
-              </>
-            )}
+            {state.inspectorSubTab === 'keying' && <NotWired feature="Chroma keying" />}
 
-            {state.inspectorSubTab === 'materials' && (
-              <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                Material slots connect to Babylon PBR pipeline in Milestone 1.
-              </p>
-            )}
+            {state.inspectorSubTab === 'materials' && <NotWired feature="Material editing" />}
           </div>
         </>
       ) : (
@@ -231,6 +210,27 @@ export function Inspector() {
         </div>
       )}
     </aside>
+  );
+}
+
+function NotWired({ feature }: { feature: string }) {
+  return (
+    <div
+      style={{
+        border: '1px dashed var(--border-active)',
+        borderRadius: 4,
+        padding: 12,
+        fontSize: 10,
+        lineHeight: 1.5,
+        color: 'var(--text-muted)',
+      }}
+    >
+      <strong style={{ color: 'var(--text-secondary)' }}>{feature}</strong> — not wired yet.
+      <br />
+      This panel will be connected to real engine state in a later phase. No
+      placeholder controls are shown so the UI never implies behaviour that
+      isn&apos;t there.
+    </div>
   );
 }
 

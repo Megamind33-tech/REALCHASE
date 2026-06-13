@@ -12,7 +12,7 @@ export function OutputPanel() {
   // with the Phase 2 audio pipeline.
   const [channels, setChannels] = useState<AudioChannel[]>(AUDIO_CHANNELS);
 
-  if (state.rightPanelCollapsed || state.activeModule === 'settings') return null;
+  if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
   return (
     <div

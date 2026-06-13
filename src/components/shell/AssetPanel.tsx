@@ -120,9 +120,10 @@ export function AssetPanel() {
             />
           </div>
           <button
-            aria-label="Filter"
+            aria-label="Filter (not wired yet)"
+            title="Filter — not wired yet"
+            disabled
             style={{ width: 28, height: 28, border: '1px solid var(--border-subtle)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => dispatch({ type: 'SHOW_TOAST', message: 'Filter options' })}
           >
             <Filter size={12} />
           </button>
@@ -203,13 +204,15 @@ export function AssetPanel() {
           })}
         </div>
 
-        <div className="section-label" style={{ marginBottom: 6 }}>Lighting Presets</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        <div className="section-label" style={{ marginBottom: 6 }}>
+          Lighting Presets <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· not wired yet</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, opacity: 0.5 }}>
           {LIGHTING_PRESETS.map((preset) => (
             <button
               key={preset.id}
-              title={preset.name}
-              onClick={() => dispatch({ type: 'SHOW_TOAST', message: `Applied: ${preset.name}` })}
+              title={`${preset.name} — not wired yet`}
+              disabled
               style={{
                 width: 36,
                 height: 36,
@@ -217,7 +220,7 @@ export function AssetPanel() {
                 border: '2px solid var(--border-subtle)',
                 background: preset.color,
               }}
-              aria-label={preset.name}
+              aria-label={`${preset.name} (not wired yet)`}
             />
           ))}
         </div>

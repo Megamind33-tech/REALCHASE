@@ -7,8 +7,12 @@ import { Timeline } from './Timeline';
 import { Inspector, InspectorExpandHandle } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
+import { useShell } from '@/context/ShellContext';
 
 export function AppShell() {
+  const { state } = useShell();
+  const showRightColumn = state.activeModule !== 'switcher' && state.activeModule !== 'settings';
+
   return (
     <div
       style={{
@@ -31,19 +35,23 @@ export function AppShell() {
           <Timeline />
         </main>
 
-        <InspectorExpandHandle />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            flexShrink: 0,
-            minHeight: 0,
-            width: 'var(--inspector-w)',
-          }}
-        >
-          <Inspector />
-          <OutputPanel />
-        </div>
+        {showRightColumn && (
+          <>
+            <InspectorExpandHandle />
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                flexShrink: 0,
+                minHeight: 0,
+                width: 'var(--inspector-w)',
+              }}
+            >
+              <Inspector />
+              <OutputPanel />
+            </div>
+          </>
+        )}
       </div>
 
       <StatusBar />

@@ -2,6 +2,7 @@ import {
   AbstractMesh,
   ArcRotateCamera,
   Color3,
+  Color4,
   Engine,
   FilesInputStore,
   FreeCamera,
@@ -14,6 +15,7 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VideoTexture,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { loadScene, type SceneLoaderQualitySelector } from 'babylonjs-editor-tools';
@@ -27,6 +29,7 @@ import { QUALITY_PROFILES } from './qualityProfile';
 import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sceneRegistry';
 import { LAYER_TO_OBJECT } from './sceneRegistry';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
+import type { PlacementMode } from '@/sources/sourceTypes';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -55,6 +58,10 @@ export class StudioEngine {
   private canvas: HTMLCanvasElement | null = null;
   private disposed = false;
   private packNodes: Array<AbstractMesh | TransformNode> = [];
+  // Program media (live source rendered as a separate, selectable scene object).
+  private programPlane: Mesh | null = null;
+  private programTexture: VideoTexture | null = null;
+  private programVideoEl: HTMLVideoElement | null = null;
 
   init(canvas: HTMLCanvasElement) {
     if (this.engine) return;
@@ -86,6 +93,7 @@ export class StudioEngine {
 
     this.engine.runRenderLoop(() => {
       if (this.disposed || !this.scene || !this.engine) return;
+      this.programTexture?.update(); // pull the latest video frame into the GPU texture
       this.scene.render();
     });
 
@@ -395,6 +403,110 @@ export class StudioEngine {
     return true;
   }
 
+  /**
+   * Render the live Program video as a dedicated, selectable media object inside
+   * the studio — a separate scene object, never the set background. Pass null to
+   * remove it. The MediaStream lifecycle is owned by the caller (SourcesContext);
+   * this method only binds the stream to an off-screen <video> and samples its
+   * frames into a DynamicTexture (works identically on GPU and software WebGL).
+   *
+   * Only `mediaPlane` is implemented in this slice; other placement modes fall
+   * back to it until they are wired.
+   */
+  setProgramStream(stream: MediaStream | null, placement: PlacementMode = 'mediaPlane') {
+    if (!this.scene) return;
+    if (!stream) {
+      this.clearProgramMedia();
+      return;
+    }
+    void placement; // screenInsert/presenterPlate/backgroundPlate not wired yet
+
+    if (!this.programVideoEl) {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      // Kept in the DOM AND within the viewport (tiny + near-invisible): browsers
+      // suspend frame decoding for off-screen/display:none video, which would
+      // starve the texture. This keeps real frames flowing without being seen.
+      video.style.cssText =
+        'position:fixed;right:0;bottom:0;width:16px;height:16px;opacity:0.01;z-index:0;pointer-events:none;';
+      document.body.appendChild(video);
+      this.programVideoEl = video;
+    }
+    this.programVideoEl.srcObject = stream;
+    void this.programVideoEl.play().catch(() => {});
+
+    if (!this.programPlane) {
+      const plane = MeshBuilder.CreatePlane(
+        'programMedia',
+        { width: 1, height: 1, sideOrientation: Mesh.DOUBLESIDE },
+        this.scene,
+      );
+      plane.position = new Vector3(0, 2.6, 3.2); // floating in the set, in front of the LED wall
+      plane.rotation.y = Math.PI; // face the default front camera without mirroring
+      plane.scaling = new Vector3((16 / 9) * 2, 2, 1); // 16:9 default, 2 units tall
+
+      const mat = new StandardMaterial('programMediaMat', this.scene);
+      mat.backFaceCulling = false;
+      mat.emissiveColor = new Color3(0.02, 0.04, 0.08); // neutral until frames arrive
+      mat.diffuseColor = new Color3(0, 0, 0);
+      mat.specularColor = new Color3(0, 0, 0);
+      plane.material = mat;
+
+      // Always-on placement frame so the source reads as a separate object.
+      plane.enableEdgesRendering();
+      plane.edgesWidth = 6;
+      plane.edgesColor = new Color4(0.23, 0.51, 0.96, 1);
+
+      plane.metadata = { chaseId: 'program-media', displayName: 'Program Media' };
+      this.programPlane = plane;
+    }
+
+    const applyTexture = () => {
+      if (this.disposed || !this.scene || !this.programPlane || !this.programVideoEl) return;
+      const w = this.programVideoEl.videoWidth || 1280;
+      const h = this.programVideoEl.videoHeight || 720;
+      this.programTexture?.dispose();
+      // Canonical live-video integration: a Babylon VideoTexture bound to the
+      // managed <video>. Frames are pushed each render tick (see render loop).
+      const tex = new VideoTexture('programFeed', this.programVideoEl, this.scene, false, true);
+      const mat = this.programPlane.material as StandardMaterial;
+      mat.emissiveTexture = tex;
+      mat.emissiveColor = new Color3(1, 1, 1);
+      this.programTexture = tex;
+      // Preserve the source aspect ratio so faces/bodies are never deformed.
+      const height = 2;
+      this.programPlane.scaling = new Vector3((w / h) * height, height, 1);
+    };
+
+    const video = this.programVideoEl;
+    if (video.videoWidth > 0) applyTexture();
+    else video.addEventListener('loadedmetadata', applyTexture, { once: true });
+
+    this.emitSceneGraph();
+    this.selectObject('program-media'); // surface placement handles immediately
+  }
+
+  private clearProgramMedia() {
+    this.programTexture?.dispose();
+    this.programTexture = null;
+    if (this.programPlane) {
+      if (this.selectedId === 'program-media') {
+        this.gizmoManager?.attachToMesh(null);
+        this.selectedId = null;
+      }
+      this.programPlane.dispose();
+      this.programPlane = null;
+    }
+    if (this.programVideoEl) {
+      this.programVideoEl.srcObject = null;
+      this.programVideoEl.remove();
+      this.programVideoEl = null;
+    }
+    this.emitSceneGraph();
+  }
+
   getSceneNodes(): SceneNodeInfo[] {
     if (!this.scene) return [];
     const nodes = new Map<string, SceneNodeInfo>();
@@ -429,6 +541,16 @@ export class StudioEngine {
 
   dispose() {
     this.disposed = true;
+    // Drop the Program media texture + off-screen video (never stops tracks —
+    // SourcesContext owns the MediaStream lifecycle).
+    this.programTexture?.dispose();
+    this.programTexture = null;
+    this.programPlane = null;
+    if (this.programVideoEl) {
+      this.programVideoEl.srcObject = null;
+      this.programVideoEl.remove();
+      this.programVideoEl = null;
+    }
     this.resizeObserver?.disconnect();
     this.gizmoManager?.dispose();
     this.scene?.dispose();
