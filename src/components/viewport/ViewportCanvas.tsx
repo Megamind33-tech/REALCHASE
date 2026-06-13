@@ -1,75 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { useShell } from '@/context/ShellContext';
-import { useSources } from '@/context/SourcesContext';
-
-/**
- * Docked Program confidence monitor (DOM <video>).
- *
- * TEMPORARY/COMPLEMENTARY, by design and documented: the real in-scene
- * compositing is the Babylon `program-media` plane driven by a VideoTexture
- * (StudioEngine.setProgramStream). That engine path displays the feed on GPU
- * hardware; the current CI/software-WebGL host cannot sample uploaded textures
- * (the pre-existing desk-screen DynamicTexture renders white too), so this
- * bounded, labelled monitor guarantees the operator/evidence always sees the
- * live Program pixels. It is NOT claimed to be the engine integration and is
- * not a full-screen background — it is a docked monitor over the viewport.
- */
-function ProgramMonitor({ stream, label }: { stream: MediaStream; label: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.srcObject = stream;
-    void el.play().catch(() => {});
-    return () => {
-      if (el) el.srcObject = null; // detach only; the Source owns the stream
-    };
-  }, [stream]);
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        right: 12,
-        top: 12,
-        width: '32%',
-        maxWidth: 380,
-        aspectRatio: '16 / 9',
-        border: '2px solid var(--status-rec)',
-        borderRadius: 4,
-        overflow: 'hidden',
-        background: '#000',
-        zIndex: 3,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.55)',
-      }}
-    >
-      <video ref={ref} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-      <span
-        style={{
-          position: 'absolute',
-          top: 4,
-          left: 6,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.04em',
-          color: '#fff',
-          background: 'var(--status-rec)',
-          padding: '1px 6px',
-          borderRadius: 2,
-        }}
-      >
-        ● PROGRAM · {label}
-      </span>
-    </div>
-  );
-}
 
 export function ViewportCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { initCanvas, importGltfFiles } = useEditorBridge();
   const { state, dispatch } = useShell();
-  const { programSource } = useSources();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,8 +51,6 @@ export function ViewportCanvas() {
           outline: 'none',
         }}
       />
-
-      {programSource?.stream && <ProgramMonitor stream={programSource.stream} label={programSource.name} />}
 
       {state.showSafeArea && (
         <>

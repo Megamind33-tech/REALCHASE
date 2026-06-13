@@ -1,3 +1,10 @@
+> **UPDATE (superseded):** the CI texture caveat below was **resolved**. Babylon's
+> `StandardMaterial` mis-samples textures under CI software-WebGL, but a custom
+> `ShaderMaterial` samples correctly, so the live video now renders **on the
+> Babylon plane in CI** and the DOM Program monitor was removed. See the
+> authoritative, current evidence in `../3d-video-placement/`
+> (`VIDEO_PLACEMENT_EVIDENCE.md`). This file is kept for history.
+
 # Phase 2 — Source Placement Evidence
 
 How the live video source is treated as a **separate broadcast object** inside

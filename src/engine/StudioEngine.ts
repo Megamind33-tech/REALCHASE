@@ -3,6 +3,7 @@ import {
   ArcRotateCamera,
   Color3,
   Color4,
+  Effect,
   Engine,
   FilesInputStore,
   FreeCamera,
@@ -12,6 +13,7 @@ import {
   ImportMeshAsync,
   PointerEventTypes,
   Scene,
+  ShaderMaterial,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -39,6 +41,21 @@ export type StudioEngineEvent =
   | { type: 'selected'; objectId: string | null }
   | { type: 'scene-graph'; nodes: SceneNodeInfo[] }
   | { type: 'error'; message: string };
+
+// Minimal unlit textured shader for the Program media plane. Babylon's
+// StandardMaterial texture sampling misbehaves on some software-WebGL backends
+// (e.g. SwiftShader in CI), so the live source is drawn with this purpose-built
+// shader, which samples reliably on both GPU and software renderers.
+const MEDIA_SHADER = 'chaseMedia';
+let mediaShaderRegistered = false;
+function registerMediaShader() {
+  if (mediaShaderRegistered) return;
+  Effect.ShadersStore[`${MEDIA_SHADER}VertexShader`] =
+    'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; void main(){ vUv = uv; gl_Position = worldViewProjection * vec4(position, 1.0); }';
+  Effect.ShadersStore[`${MEDIA_SHADER}FragmentShader`] =
+    'precision highp float; varying vec2 vUv; uniform sampler2D videoSampler; void main(){ gl_FragColor = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y)); }';
+  mediaShaderRegistered = true;
+}
 
 export class StudioEngine {
   private engine: Engine | null = null;
@@ -438,6 +455,7 @@ export class StudioEngine {
     void this.programVideoEl.play().catch(() => {});
 
     if (!this.programPlane) {
+      registerMediaShader();
       const plane = MeshBuilder.CreatePlane(
         'programMedia',
         { width: 1, height: 1, sideOrientation: Mesh.DOUBLESIDE },
@@ -447,11 +465,15 @@ export class StudioEngine {
       plane.rotation.y = Math.PI; // face the default front camera without mirroring
       plane.scaling = new Vector3((16 / 9) * 2, 2, 1); // 16:9 default, 2 units tall
 
-      const mat = new StandardMaterial('programMediaMat', this.scene);
+      // Unlit, purpose-built shader that samples the live VideoTexture reliably
+      // (StandardMaterial texture sampling fails on some software-WebGL backends).
+      const mat = new ShaderMaterial(
+        'programMediaMat',
+        this.scene,
+        { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection'], samplers: ['videoSampler'] },
+      );
       mat.backFaceCulling = false;
-      mat.emissiveColor = new Color3(0.02, 0.04, 0.08); // neutral until frames arrive
-      mat.diffuseColor = new Color3(0, 0, 0);
-      mat.specularColor = new Color3(0, 0, 0);
       plane.material = mat;
 
       // Always-on placement frame so the source reads as a separate object.
@@ -471,9 +493,7 @@ export class StudioEngine {
       // Canonical live-video integration: a Babylon VideoTexture bound to the
       // managed <video>. Frames are pushed each render tick (see render loop).
       const tex = new VideoTexture('programFeed', this.programVideoEl, this.scene, false, true);
-      const mat = this.programPlane.material as StandardMaterial;
-      mat.emissiveTexture = tex;
-      mat.emissiveColor = new Color3(1, 1, 1);
+      (this.programPlane.material as ShaderMaterial).setTexture('videoSampler', tex);
       this.programTexture = tex;
       // Preserve the source aspect ratio so faces/bodies are never deformed.
       const height = 2;

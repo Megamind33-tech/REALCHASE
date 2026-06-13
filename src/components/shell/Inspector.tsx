@@ -111,12 +111,15 @@ export function Inspector() {
 
             {state.inspectorSubTab === 'layout' && (
               <>
-                <div className="section-label" style={{ marginBottom: 6 }}>Layout Presets</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 12 }}>
+                <div className="section-label" style={{ marginBottom: 6 }}>
+                  Layout Presets <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>· not wired yet</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 12, opacity: 0.5 }}>
                   {LAYOUT_PRESETS.map((preset) => (
                     <button
                       key={preset}
-                      onClick={() => dispatch({ type: 'SHOW_TOAST', message: `Layout: ${preset}` })}
+                      disabled
+                      title={`${preset} layout — not wired yet`}
                       style={{
                         padding: 8,
                         border: '1px solid var(--border-subtle)',
