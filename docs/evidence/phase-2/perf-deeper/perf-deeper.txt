@@ -1,0 +1,8 @@
+overlay: CAM 2 · BALANCED · 10 fps
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [18:11:37]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:11:48]: Babylon.js v9.9.1 - WebGL2
