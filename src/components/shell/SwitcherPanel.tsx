@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Video, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSources } from '@/context/SourcesContext';
+import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { DEFAULT_KEYING_SETTINGS, IMPLEMENTED_PLACEMENT_MODES, type KeyingMode, type KeyingSettings, type Source } from '@/sources/sourceTypes';
 
 /** Renders a live MediaStream into a <video>. srcObject must be set imperatively. */
@@ -105,6 +106,7 @@ function KeySlider({ label, value, min, max, step, onChange }: { label: string; 
 
 /** Real chroma-key / alpha calibration bound to the live media shader uniforms. */
 function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange: (next: KeyingSettings) => void }) {
+  const { sampleKeyColor } = useEditorBridge();
   const set = (patch: Partial<KeyingSettings>) => onChange({ ...keying, ...patch });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, marginLeft: 26, background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
@@ -115,6 +117,15 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
             Key color
             <input type="color" value={keying.keyColor} onChange={(e) => set({ keyColor: e.target.value })} style={{ width: 28, height: 18, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="Key color" />
           </label>
+        )}
+        {keying.mode === 'chromaKey' && (
+          <button
+            onClick={() => { const sampled = sampleKeyColor(); if (sampled) set({ keyColor: sampled }); }}
+            title="Sample the key colour from the live Program backdrop"
+            style={{ fontSize: 9, padding: '2px 8px', borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'var(--bg-panel-raised)', color: 'var(--text-secondary)' }}
+          >
+            Auto
+          </button>
         )}
         <button
           onClick={() => set({ showMatte: !keying.showMatte })}

@@ -1,0 +1,9 @@
+auto-sampled key color: #029500
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [17:59:55]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:00:04]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [18:00:11]: Babylon.js v9.9.1 - WebGL2

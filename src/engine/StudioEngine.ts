@@ -52,29 +52,38 @@ function registerMediaShader() {
   if (mediaShaderRegistered) return;
   Effect.ShadersStore[`${MEDIA_SHADER}VertexShader`] =
     'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; void main(){ vUv = uv; gl_Position = worldViewProjection * vec4(position, 1.0); }';
+  // Single-pass, single-sample broadcast-style keyer (no extra render passes /
+  // no per-frame CPU work) so it stays smooth: keys in CbCr chroma space
+  // (luminance-tolerant → clean edges under uneven lighting), with a
+  // luminance-preserving despill and a free smootherstep edge.
   Effect.ShadersStore[`${MEDIA_SHADER}FragmentShader`] = [
     'precision highp float;',
     'varying vec2 vUv;',
     'uniform sampler2D videoSampler;',
     'uniform int keyMode;',      // 0 disabled, 1 chromaKey, 2 alpha
     'uniform vec3 keyColor;',
-    'uniform float similarity;', // base key threshold
+    'uniform float similarity;', // base key threshold (chroma distance)
     'uniform float smoothness;', // edge softness
     'uniform float spill;',      // spill suppression amount 0..1
     'uniform float opacity;',
     'uniform int showMatte;',    // 1 => render the alpha matte for calibration
+    // BT.601 chroma (Cb,Cr) — keying on chroma only ignores brightness, so
+    // shadows/highlights on the backdrop don't tear holes in the key.
+    'vec2 chroma(vec3 c){ return vec2(-0.168736*c.r - 0.331264*c.g + 0.5*c.b, 0.5*c.r - 0.418688*c.g - 0.081312*c.b); }',
     'void main(){',
     '  vec4 c = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y));',
     '  vec3 rgb = c.rgb;',
     '  float alpha = c.a;',
     '  if (keyMode == 1) {',
-    '    float d = distance(c.rgb, keyColor);',
+    '    float d = distance(chroma(c.rgb), chroma(keyColor));',
     '    alpha = smoothstep(similarity, similarity + max(smoothness, 0.0001), d);',
-    // Spill suppression: clamp the dominant key channel toward the other two.
+    '    alpha = alpha * alpha * (3.0 - 2.0 * alpha);', // smootherstep — cleaner matte edge, free
+    // Luminance-preserving despill: cap the dominant key channel at the brighter
+    // of the other two so fringe loses the key tint without going dark.
     '    vec3 sp = c.rgb;',
-    '    if (keyColor.g >= keyColor.r && keyColor.g >= keyColor.b) { sp.g = min(sp.g, (sp.r + sp.b) * 0.5); }',
-    '    else if (keyColor.b >= keyColor.r && keyColor.b >= keyColor.g) { sp.b = min(sp.b, (sp.r + sp.g) * 0.5); }',
-    '    else { sp.r = min(sp.r, (sp.g + sp.b) * 0.5); }',
+    '    if (keyColor.g >= keyColor.r && keyColor.g >= keyColor.b) { sp.g = min(sp.g, max(sp.r, sp.b)); }',
+    '    else if (keyColor.b >= keyColor.r && keyColor.b >= keyColor.g) { sp.b = min(sp.b, max(sp.r, sp.g)); }',
+    '    else { sp.r = min(sp.r, max(sp.g, sp.b)); }',
     '    rgb = mix(c.rgb, sp, clamp(spill, 0.0, 1.0));',
     '  } else if (keyMode == 2) {',
     '    alpha = c.a;',
@@ -679,6 +688,32 @@ export class StudioEngine {
    */
   setActive(active: boolean) {
     this.renderingPaused = !active;
+  }
+
+  /**
+   * One-shot: sample the average colour of the Program video's top-left region
+   * (typically backdrop) so the operator can auto-pick the key colour. Returns a
+   * hex string, or null when there is no live Program video. CPU one-shot — not
+   * called per frame.
+   */
+  sampleProgramKeyColor(): string | null {
+    const video = this.programVideoEl;
+    if (!video || !video.videoWidth) return null;
+    const w = 64;
+    const h = 36;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, w, h);
+    const bw = Math.max(1, Math.floor(w * 0.25));
+    const bh = Math.max(1, Math.floor(h * 0.25));
+    const data = ctx.getImageData(0, 0, bw, bh).data;
+    let r = 0; let g = 0; let b = 0; let n = 0;
+    for (let i = 0; i < data.length; i += 4) { r += data[i]; g += data[i + 1]; b += data[i + 2]; n += 1; }
+    const hex = (x: number) => Math.round(x / n).toString(16).padStart(2, '0');
+    return `#${hex(r)}${hex(g)}${hex(b)}`;
   }
 
   subscribe(listener: StudioEngineListener) {

@@ -15,6 +15,7 @@ interface EditorBridgeValue {
   engine: StudioEngine | null;
   initCanvas: (canvas: HTMLCanvasElement) => void;
   setActive: (active: boolean) => void;
+  sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
   importGltfFiles: (files: File[]) => Promise<number>;
@@ -107,6 +108,8 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engineRef.current?.setActive(active);
   }, []);
 
+  const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
+
   const addObject = useCallback((objectId: string) => {
     return engineRef.current?.addSceneObject(objectId) ?? false;
   }, []);
@@ -129,6 +132,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         engine,
         initCanvas,
         setActive,
+        sampleKeyColor,
         addObject,
         loadPack,
         importGltfFiles,
