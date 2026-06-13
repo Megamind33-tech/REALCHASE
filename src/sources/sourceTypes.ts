@@ -29,7 +29,11 @@ export interface KeyingSettings {
   keyColor: string;
   similarity: number;
   smoothness: number;
+  /** Spill suppression amount (0 = none, 1 = full key-channel desaturation). */
+  spill: number;
   opacity: number;
+  /** When true the shader renders the alpha matte (grayscale) for calibration. */
+  showMatte: boolean;
 }
 
 export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
@@ -37,7 +41,9 @@ export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
   keyColor: '#00ff00',
   similarity: 0.32,
   smoothness: 0.08,
+  spill: 0.5,
   opacity: 1,
+  showMatte: false,
 };
 
 /** Placement modes actually wired in this phase. */

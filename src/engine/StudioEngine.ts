@@ -52,8 +52,37 @@ function registerMediaShader() {
   if (mediaShaderRegistered) return;
   Effect.ShadersStore[`${MEDIA_SHADER}VertexShader`] =
     'precision highp float; attribute vec3 position; attribute vec2 uv; uniform mat4 worldViewProjection; varying vec2 vUv; void main(){ vUv = uv; gl_Position = worldViewProjection * vec4(position, 1.0); }';
-  Effect.ShadersStore[`${MEDIA_SHADER}FragmentShader`] =
-    'precision highp float; varying vec2 vUv; uniform sampler2D videoSampler; uniform int keyMode; uniform vec3 keyColor; uniform float similarity; uniform float smoothness; uniform float opacity; void main(){ vec4 c = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y)); float a = c.a; if(keyMode == 1){ float d = distance(c.rgb, keyColor); a *= smoothstep(similarity, similarity + smoothness, d); } if(keyMode == 2){ a = c.a; } gl_FragColor = vec4(c.rgb, a * opacity); }';
+  Effect.ShadersStore[`${MEDIA_SHADER}FragmentShader`] = [
+    'precision highp float;',
+    'varying vec2 vUv;',
+    'uniform sampler2D videoSampler;',
+    'uniform int keyMode;',      // 0 disabled, 1 chromaKey, 2 alpha
+    'uniform vec3 keyColor;',
+    'uniform float similarity;', // base key threshold
+    'uniform float smoothness;', // edge softness
+    'uniform float spill;',      // spill suppression amount 0..1
+    'uniform float opacity;',
+    'uniform int showMatte;',    // 1 => render the alpha matte for calibration
+    'void main(){',
+    '  vec4 c = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y));',
+    '  vec3 rgb = c.rgb;',
+    '  float alpha = c.a;',
+    '  if (keyMode == 1) {',
+    '    float d = distance(c.rgb, keyColor);',
+    '    alpha = smoothstep(similarity, similarity + max(smoothness, 0.0001), d);',
+    // Spill suppression: clamp the dominant key channel toward the other two.
+    '    vec3 sp = c.rgb;',
+    '    if (keyColor.g >= keyColor.r && keyColor.g >= keyColor.b) { sp.g = min(sp.g, (sp.r + sp.b) * 0.5); }',
+    '    else if (keyColor.b >= keyColor.r && keyColor.b >= keyColor.g) { sp.b = min(sp.b, (sp.r + sp.g) * 0.5); }',
+    '    else { sp.r = min(sp.r, (sp.g + sp.b) * 0.5); }',
+    '    rgb = mix(c.rgb, sp, clamp(spill, 0.0, 1.0));',
+    '  } else if (keyMode == 2) {',
+    '    alpha = c.a;',
+    '  }',
+    '  if (showMatte == 1) { gl_FragColor = vec4(vec3(alpha), 1.0); return; }',
+    '  gl_FragColor = vec4(rgb, alpha * opacity);',
+    '}',
+  ].join('\n');
   mediaShaderRegistered = true;
 }
 
@@ -79,6 +108,7 @@ export class StudioEngine {
   private programPlane: Mesh | null = null;
   private programTexture: VideoTexture | null = null;
   private programVideoEl: HTMLVideoElement | null = null;
+  private programStream: MediaStream | null = null;
   private programPlacement: PlacementMode = 'mediaPlane';
   private screenInsertTargets = new Set(['led-main', 'led-side', 'desk-screen', 'screen-insert-test']);
 
@@ -447,6 +477,17 @@ export class StudioEngine {
     if (placement === 'screenInsert' && !this.screenInsertTargets.has(screenTargetId)) screenTargetId = 'screen-insert-test';
     if (placement === 'screenInsert') this.ensureScreenInsertTarget(screenTargetId);
 
+    // Fast path: same live stream already bound — re-apply placement + keying
+    // WITHOUT rebuilding the VideoTexture, so live keying/placement sliders don't
+    // flicker or reset the feed.
+    if (stream === this.programStream && this.programPlane && this.programTexture && this.programVideoEl?.videoWidth) {
+      const mat = this.programPlane.material as ShaderMaterial;
+      this.applyProgramPlacement(placement, screenTargetId, this.programVideoEl.videoWidth / this.programVideoEl.videoHeight);
+      this.applyKeying(mat, keying, placement);
+      return;
+    }
+    this.programStream = stream;
+
     if (!this.programVideoEl) {
       const video = document.createElement('video');
       video.muted = true;
@@ -480,7 +521,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'opacity'], samplers: ['videoSampler'], needAlphaBlending: true },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'opacity', 'showMatte'], samplers: ['videoSampler'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -495,7 +536,9 @@ export class StudioEngine {
       mat.setVector3('keyColor', new Vector3(0, 1, 0));
       mat.setFloat('similarity', 0.32);
       mat.setFloat('smoothness', 0.08);
+      mat.setFloat('spill', 0.5);
       mat.setFloat('opacity', 1);
+      mat.setInt('showMatte', 0);
       this.programPlane = plane;
     }
 
@@ -564,7 +607,9 @@ export class StudioEngine {
     mat.setVector3('keyColor', new Vector3(color.r, color.g, color.b));
     mat.setFloat('similarity', keying.similarity);
     mat.setFloat('smoothness', keying.smoothness);
+    mat.setFloat('spill', keying.spill ?? 0.5);
     mat.setFloat('opacity', keying.opacity);
+    mat.setInt('showMatte', keying.showMatte ? 1 : 0);
     mat.needAlphaBlending = () => mode !== 'disabled' || keying.opacity < 1;
   }
 
@@ -584,6 +629,7 @@ export class StudioEngine {
       this.programVideoEl.remove();
       this.programVideoEl = null;
     }
+    this.programStream = null;
     this.emitSceneGraph();
   }
 

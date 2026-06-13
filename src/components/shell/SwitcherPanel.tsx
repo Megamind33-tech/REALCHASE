@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Video, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSources } from '@/context/SourcesContext';
-import { DEFAULT_KEYING_SETTINGS, IMPLEMENTED_PLACEMENT_MODES, type KeyingMode, type Source } from '@/sources/sourceTypes';
+import { DEFAULT_KEYING_SETTINGS, IMPLEMENTED_PLACEMENT_MODES, type KeyingMode, type KeyingSettings, type Source } from '@/sources/sourceTypes';
 
 /** Renders a live MediaStream into a <video>. srcObject must be set imperatively. */
 function VideoView({ stream, label }: { stream: MediaStream | null; label: string }) {
@@ -93,6 +93,49 @@ function Monitor({ title, stream, accent, tally }: { title: string; stream: Medi
   );
 }
 
+function KeySlider({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: 'var(--text-secondary)' }}>
+      <span style={{ width: 78 }}>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent-blue)' }} aria-label={label} />
+      <span className="mono" style={{ width: 32, textAlign: 'right', color: 'var(--text-primary)' }}>{value.toFixed(2)}</span>
+    </label>
+  );
+}
+
+/** Real chroma-key / alpha calibration bound to the live media shader uniforms. */
+function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange: (next: KeyingSettings) => void }) {
+  const set = (patch: Partial<KeyingSettings>) => onChange({ ...keying, ...patch });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8, marginLeft: 26, background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span className="section-label">Keying · {keying.mode}</span>
+        {keying.mode === 'chromaKey' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text-secondary)' }}>
+            Key color
+            <input type="color" value={keying.keyColor} onChange={(e) => set({ keyColor: e.target.value })} style={{ width: 28, height: 18, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="Key color" />
+          </label>
+        )}
+        <button
+          onClick={() => set({ showMatte: !keying.showMatte })}
+          aria-pressed={keying.showMatte}
+          style={{ marginLeft: 'auto', fontSize: 9, padding: '2px 8px', borderRadius: 3, border: `1px solid ${keying.showMatte ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, background: keying.showMatte ? 'var(--accent-blue-dim)' : 'transparent', color: keying.showMatte ? 'var(--accent-blue)' : 'var(--text-secondary)' }}
+        >
+          {keying.showMatte ? 'Matte: ON' : 'Show matte'}
+        </button>
+      </div>
+      {keying.mode === 'chromaKey' && (
+        <>
+          <KeySlider label="Similarity" value={keying.similarity} min={0} max={1} step={0.01} onChange={(v) => set({ similarity: v })} />
+          <KeySlider label="Smoothness" value={keying.smoothness} min={0} max={0.5} step={0.01} onChange={(v) => set({ smoothness: v })} />
+          <KeySlider label="Spill" value={keying.spill} min={0} max={1} step={0.01} onChange={(v) => set({ spill: v })} />
+        </>
+      )}
+      <KeySlider label="Opacity" value={keying.opacity} min={0} max={1} step={0.01} onChange={(v) => set({ opacity: v })} />
+    </div>
+  );
+}
+
 export function SwitcherPanel() {
   const { sources, addWebcamSource, removeSource, setPreview, cut, previewSource, programSource, roleOf, previewId, updateSourcePlacement, updateSourceKeying } =
     useSources();
@@ -142,9 +185,10 @@ export function SwitcherPanel() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {sources.map((source) => {
               const role = roleOf(source.id);
+              const keying = source.keying ?? DEFAULT_KEYING_SETTINGS;
               return (
+                <div key={source.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div
-                  key={source.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -218,6 +262,13 @@ export function SwitcherPanel() {
                   <Button variant="ghost" onClick={() => removeSource(source.id)} aria-label={`Remove ${source.name}`} style={{ height: 24 }}>
                     <Trash2 size={14} />
                   </Button>
+                </div>
+                {source.placement === 'presenterPlate' && keying.mode !== 'disabled' && (
+                  <KeyingControls
+                    keying={keying}
+                    onChange={(next) => updateSourceKeying(source.id, next)}
+                  />
+                )}
                 </div>
               );
             })}
