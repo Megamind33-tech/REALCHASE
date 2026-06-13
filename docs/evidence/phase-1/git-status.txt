@@ -1,0 +1,5 @@
+$ git status --short   (captured immediately after the Phase 1 commit, 14fa535)
+(empty output = working tree clean)
+
+Note: the only change after this snapshot is adding this evidence file itself,
+which is then committed — leaving the tree clean again.
