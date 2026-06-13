@@ -114,6 +114,11 @@ export class StudioEngine {
   private disposed = false;
   private renderingPaused = false;
   private visibilityHandler: (() => void) | null = null;
+  private lastInteractionAt = 0;
+  private frameCounter = 0;
+  private baseScaling = 1;
+  private adaptiveStep = 0;
+  private lowFpsRenders = 0;
   private packNodes: Array<AbstractMesh | TransformNode> = [];
   // Program media (live source rendered as a separate, selectable scene object).
   private programPlane: Mesh | null = null;
@@ -150,6 +155,12 @@ export class StudioEngine {
     this.gizmoManager.rotationGizmoEnabled = false;
     this.gizmoManager.scaleGizmoEnabled = false;
 
+    // Freeze materials that never change so Babylon skips their per-frame
+    // readiness/dirty checks. The dynamic ones (desk, floor, desk-screen, and
+    // the live program shader created later) are intentionally left unfrozen.
+    const dynamicMats = new Set(['deskMat', 'floorMat', 'deskScreenMat']);
+    this.scene.materials.forEach((m) => { if (!dynamicMats.has(m.name)) m.freeze(); });
+
     this.setupPicking();
     this.selectObject('desk');
     this.applyQuality(this.qualityMode);
@@ -160,6 +171,14 @@ export class StudioEngine {
       if (this.disposed || this.renderingPaused || !this.scene || !this.engine) return;
       // Don't burn GPU/CPU rendering a tab the operator can't see.
       if (typeof document !== 'undefined' && document.hidden) return;
+      this.frameCounter += 1;
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const live = !!this.programTexture; // a live Program feed needs every frame
+      const active = now - this.lastInteractionAt < 1500; // recent camera/gizmo/pointer use
+      // Idle (no live feed, no recent interaction): drop to ~10 redraws/sec to
+      // save GPU. Any interaction or a live feed restores full rate. Never zero
+      // (a heartbeat frame every 6th) so the viewport can't get stuck.
+      if (!live && !active && this.frameCounter % 6 !== 0) return;
       this.programTexture?.update(); // pull the latest video frame into the GPU texture
       this.scene.render();
     });
@@ -182,12 +201,37 @@ export class StudioEngine {
         lastFps = fps;
         this.emit({ type: 'fps', value: fps });
       }
+      // Adaptive quality: on sustained low FPS, step the render resolution down
+      // (one-way, capped) so the app stays smooth on weak GPUs. Reset only on an
+      // explicit quality change (applyQuality), never auto-raised — avoids
+      // oscillation.
+      if (fps > 0 && fps < 20) this.lowFpsRenders += 1;
+      else this.lowFpsRenders = Math.max(0, this.lowFpsRenders - 2);
+      if (this.lowFpsRenders > 120 && this.adaptiveStep < 2) {
+        this.adaptiveStep += 1;
+        this.lowFpsRenders = 0;
+        this.applyEffectiveScaling();
+      }
     });
+  }
+
+  private applyEffectiveScaling() {
+    // Higher hardware-scaling level = fewer pixels rendered. baseScaling comes
+    // from the quality profile; adaptiveStep adds up to +0.5 on weak GPUs.
+    this.engine?.setHardwareScalingLevel(this.baseScaling * (1 + this.adaptiveStep * 0.25));
+  }
+
+  /** Mark recent user activity so the render loop runs at full rate (not idle). */
+  private markInteraction() {
+    this.lastInteractionAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   }
 
   private setupPicking() {
     if (!this.scene) return;
     this.scene.onPointerObservable.add((pointerInfo) => {
+      // Any pointer activity (orbit, gizmo drag, click) keeps the viewport at
+      // full frame rate via the idle-throttle check in the render loop.
+      this.markInteraction();
       if (pointerInfo.type !== PointerEventTypes.POINTERDOWN) return;
       if (this.transformMode !== 'select') return;
       const pick = pointerInfo.pickInfo;
@@ -325,6 +369,7 @@ export class StudioEngine {
   }
 
   selectObject(id: string) {
+    this.markInteraction();
     const changed = this.selectedId !== id;
     this.selectedId = id;
     const target = this.findMeshById(id);
@@ -345,6 +390,7 @@ export class StudioEngine {
   }
 
   setTransformMode(mode: TransformMode) {
+    this.markInteraction();
     this.transformMode = mode;
     if (!this.gizmoManager) return;
     this.gizmoManager.positionGizmoEnabled = mode === 'translate' || mode === 'select';
@@ -361,6 +407,7 @@ export class StudioEngine {
   }
 
   setActiveCamera(id: CameraId) {
+    this.markInteraction();
     const next = this.cameras.get(id);
     if (!next || !this.scene) return;
     this.cameras.get(this.activeCameraId)?.detachControl();
@@ -384,6 +431,7 @@ export class StudioEngine {
   }
 
   setViewportMode(mode: '3d' | '2d') {
+    this.markInteraction();
     this.viewportMode = mode;
     if (!this.scene) return;
     if (mode === '2d') {
@@ -410,6 +458,7 @@ export class StudioEngine {
   }
 
   applyDeskProperties(props: DeskProperties) {
+    this.markInteraction();
     this.deskProps = props;
     if (!this.refs) return;
     applyDeskVisuals(this.refs, {
@@ -428,7 +477,11 @@ export class StudioEngine {
     this.qualityMode = mode;
     if (!this.engine || !this.scene) return;
     const profile = QUALITY_PROFILES[mode];
-    this.engine.setHardwareScalingLevel(1 / profile.hardwareScaling);
+    this.baseScaling = 1 / profile.hardwareScaling;
+    this.adaptiveStep = 0; // explicit quality change resets adaptive step-down
+    this.lowFpsRenders = 0;
+    this.applyEffectiveScaling();
+    this.markInteraction();
     this.scene.shadowsEnabled = profile.shadowsEnabled;
     this.scene.meshes.forEach((m) => {
       if (m.material) m.material.needDepthPrePass = false;
@@ -440,6 +493,7 @@ export class StudioEngine {
   }
 
   addSceneObject(objectId: string): boolean {
+    this.markInteraction();
     if (!this.scene || !this.refs) return false;
     const existing = this.findMeshById(objectId);
     if (existing) {
