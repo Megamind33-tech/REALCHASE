@@ -4,14 +4,16 @@ import { useShell } from '@/context/ShellContext';
 
 export function ViewportCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { initCanvas, importGltfFiles } = useEditorBridge();
+  const { initCanvas, setActive, importGltfFiles } = useEditorBridge();
   const { state, dispatch } = useShell();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     initCanvas(canvas);
-  }, [initCanvas]);
+    setActive(true); // resume rendering while the 3D viewport is on screen
+    return () => setActive(false); // pause when leaving the Builder/viewport
+  }, [initCanvas, setActive]);
 
   return (
     <div

@@ -103,6 +103,8 @@ export class StudioEngine {
   private deskProps: DeskProperties | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private disposed = false;
+  private renderingPaused = false;
+  private visibilityHandler: (() => void) | null = null;
   private packNodes: Array<AbstractMesh | TransformNode> = [];
   // Program media (live source rendered as a separate, selectable scene object).
   private programPlane: Mesh | null = null;
@@ -117,13 +119,18 @@ export class StudioEngine {
     this.canvas = canvas;
 
     this.engine = new Engine(canvas, true, {
-      preserveDrawingBuffer: true,
+      // preserveDrawingBuffer disables GL fast paths; we capture via the DOM
+      // compositor, not canvas.toDataURL, so it is not needed.
+      preserveDrawingBuffer: false,
       stencil: true,
       adaptToDeviceRatio: true,
       antialias: true,
     });
 
     this.scene = new Scene(this.engine);
+    // Picking only happens on POINTERDOWN (see setupPicking); skip the expensive
+    // per-pointer-move ray casting Babylon does by default.
+    this.scene.skipPointerMovePicking = true;
     const built = buildDefaultStudioScene(this.scene);
     this.refs = built.refs;
     this.cameras = built.cameras;
@@ -141,10 +148,19 @@ export class StudioEngine {
     this.resizeObserver = bindEngineResize(this.engine, canvas);
 
     this.engine.runRenderLoop(() => {
-      if (this.disposed || !this.scene || !this.engine) return;
+      if (this.disposed || this.renderingPaused || !this.scene || !this.engine) return;
+      // Don't burn GPU/CPU rendering a tab the operator can't see.
+      if (typeof document !== 'undefined' && document.hidden) return;
       this.programTexture?.update(); // pull the latest video frame into the GPU texture
       this.scene.render();
     });
+
+    // Resize the backbuffer when the tab becomes visible again (it may have
+    // changed while hidden), and otherwise let the render loop idle.
+    this.visibilityHandler = () => {
+      if (!document.hidden) this.engine?.resize();
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
 
     this.emit({ type: 'ready' });
     this.emitSceneGraph();
@@ -656,6 +672,15 @@ export class StudioEngine {
     return this.canvas;
   }
 
+  /**
+   * Pause/resume the render loop. Paused when the 3D viewport isn't on screen
+   * (e.g. the operator is in the Switcher/another module) so the engine doesn't
+   * keep rendering to an off-screen canvas.
+   */
+  setActive(active: boolean) {
+    this.renderingPaused = !active;
+  }
+
   subscribe(listener: StudioEngineListener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -676,6 +701,10 @@ export class StudioEngine {
       this.programVideoEl.srcObject = null;
       this.programVideoEl.remove();
       this.programVideoEl = null;
+    }
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
     }
     this.resizeObserver?.disconnect();
     this.gizmoManager?.dispose();
