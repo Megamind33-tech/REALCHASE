@@ -16,6 +16,7 @@ import {
   ShaderMaterial,
   StandardMaterial,
   TransformNode,
+  Vector2,
   Vector3,
   VideoTexture,
 } from '@babylonjs/core';
@@ -65,19 +66,36 @@ function registerMediaShader() {
     'uniform float similarity;', // base key threshold (chroma distance)
     'uniform float smoothness;', // edge softness
     'uniform float spill;',      // spill suppression amount 0..1
+    'uniform float denoise;',    // edge matte denoise (0 = off, no extra taps)
+    'uniform float blackClip;',  // matte black point
+    'uniform float whiteClip;',  // matte white point
+    'uniform vec2 texel;',       // 1 / texture size, for neighbour taps
     'uniform float opacity;',
     'uniform int showMatte;',    // 1 => render the alpha matte for calibration
     // BT.601 chroma (Cb,Cr) — keying on chroma only ignores brightness, so
     // shadows/highlights on the backdrop don't tear holes in the key.
     'vec2 chroma(vec3 c){ return vec2(-0.168736*c.r - 0.331264*c.g + 0.5*c.b, 0.5*c.r - 0.418688*c.g - 0.081312*c.b); }',
+    'float keyAlpha(vec3 c){ float d = distance(chroma(c), chroma(keyColor)); return smoothstep(similarity, similarity + max(smoothness, 0.0001), d); }',
     'void main(){',
-    '  vec4 c = texture2D(videoSampler, vec2(vUv.x, 1.0 - vUv.y));',
+    '  vec2 uv = vec2(vUv.x, 1.0 - vUv.y);',
+    '  vec4 c = texture2D(videoSampler, uv);',
     '  vec3 rgb = c.rgb;',
     '  float alpha = c.a;',
     '  if (keyMode == 1) {',
-    '    float d = distance(chroma(c.rgb), chroma(keyColor));',
-    '    alpha = smoothstep(similarity, similarity + max(smoothness, 0.0001), d);',
-    '    alpha = alpha * alpha * (3.0 - 2.0 * alpha);', // smootherstep — cleaner matte edge, free
+    '    float a = keyAlpha(c.rgb);',
+    // Edge denoise: gated so OFF costs zero extra taps (keeps it smooth).
+    '    if (denoise > 0.001) {',
+    '      vec2 o = texel * (1.0 + denoise * 3.0);',
+    '      a += keyAlpha(texture2D(videoSampler, uv + vec2(o.x, 0.0)).rgb);',
+    '      a += keyAlpha(texture2D(videoSampler, uv - vec2(o.x, 0.0)).rgb);',
+    '      a += keyAlpha(texture2D(videoSampler, uv + vec2(0.0, o.y)).rgb);',
+    '      a += keyAlpha(texture2D(videoSampler, uv - vec2(0.0, o.y)).rgb);',
+    '      a /= 5.0;',
+    '    }',
+    // Matte clip (black/white points) then a free smootherstep edge.
+    '    a = clamp((a - blackClip) / max(whiteClip - blackClip, 0.0001), 0.0, 1.0);',
+    '    a = a * a * (3.0 - 2.0 * a);',
+    '    alpha = a;',
     // Luminance-preserving despill: cap the dominant key channel at the brighter
     // of the other two so fringe loses the key tint without going dark.
     '    vec3 sp = c.rgb;',
@@ -600,7 +618,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'opacity', 'showMatte'], samplers: ['videoSampler'], needAlphaBlending: true },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'opacity', 'showMatte'], samplers: ['videoSampler'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -616,6 +634,10 @@ export class StudioEngine {
       mat.setFloat('similarity', 0.32);
       mat.setFloat('smoothness', 0.08);
       mat.setFloat('spill', 0.5);
+      mat.setFloat('denoise', 0);
+      mat.setFloat('blackClip', 0);
+      mat.setFloat('whiteClip', 1);
+      mat.setVector2('texel', new Vector2(1 / 1280, 1 / 720));
       mat.setFloat('opacity', 1);
       mat.setInt('showMatte', 0);
       this.programPlane = plane;
@@ -631,6 +653,7 @@ export class StudioEngine {
       const tex = new VideoTexture('programFeed', this.programVideoEl, this.scene, false, true);
       const mat = this.programPlane.material as ShaderMaterial;
       mat.setTexture('videoSampler', tex);
+      mat.setVector2('texel', new Vector2(1 / w, 1 / h)); // neighbour-tap size for matte denoise
       this.applyProgramPlacement(placement, screenTargetId, w / h);
       this.applyKeying(mat, keying, placement);
       this.programTexture = tex;
@@ -687,6 +710,9 @@ export class StudioEngine {
     mat.setFloat('similarity', keying.similarity);
     mat.setFloat('smoothness', keying.smoothness);
     mat.setFloat('spill', keying.spill ?? 0.5);
+    mat.setFloat('denoise', keying.denoise ?? 0);
+    mat.setFloat('blackClip', keying.blackClip ?? 0);
+    mat.setFloat('whiteClip', keying.whiteClip ?? 1);
     mat.setFloat('opacity', keying.opacity);
     mat.setInt('showMatte', keying.showMatte ? 1 : 0);
     mat.needAlphaBlending = () => mode !== 'disabled' || keying.opacity < 1;

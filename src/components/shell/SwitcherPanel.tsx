@@ -140,6 +140,9 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
           <KeySlider label="Similarity" value={keying.similarity} min={0} max={1} step={0.01} onChange={(v) => set({ similarity: v })} />
           <KeySlider label="Smoothness" value={keying.smoothness} min={0} max={0.5} step={0.01} onChange={(v) => set({ smoothness: v })} />
           <KeySlider label="Spill" value={keying.spill} min={0} max={1} step={0.01} onChange={(v) => set({ spill: v })} />
+          <KeySlider label="Edge denoise" value={keying.denoise} min={0} max={1} step={0.01} onChange={(v) => set({ denoise: v })} />
+          <KeySlider label="Black clip" value={keying.blackClip} min={0} max={0.5} step={0.01} onChange={(v) => set({ blackClip: v })} />
+          <KeySlider label="White clip" value={keying.whiteClip} min={0.5} max={1} step={0.01} onChange={(v) => set({ whiteClip: v })} />
         </>
       )}
       <KeySlider label="Opacity" value={keying.opacity} min={0} max={1} step={0.01} onChange={(v) => set({ opacity: v })} />

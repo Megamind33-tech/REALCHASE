@@ -1,0 +1,35 @@
+import { chromium } from 'playwright';
+import { setTimeout as sleep } from 'node:timers/promises';
+import fs from 'node:fs';
+const url = process.env.URL || 'http://localhost:4177';
+const out = 'docs/evidence/phase-2/keying-matte';
+fs.mkdirSync(out, { recursive: true });
+const args = ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--no-sandbox','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream'];
+const browser = await chromium.launch({ headless: true, executablePath: process.env.PW_EXECUTABLE, args });
+const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+await ctx.grantPermissions(['camera','microphone'], { origin: url });
+const page = await ctx.newPage();
+const logs=[]; page.on('console',m=>logs.push(`[${m.type()}] ${m.text()}`)); page.on('pageerror',e=>logs.push(`[err] ${e.message}`));
+const vp = async (n) => { const e = await page.$('#babylon-viewport'); if (e) await e.screenshot({ path: `${out}/${n}` }); };
+const sel = (v) => page.evaluate((val)=>{const s=[...document.querySelectorAll('select')].find(x=>[...x.options].some(o=>o.value===val&&!o.disabled)); if(s){s.value=val; s.dispatchEvent(new Event('change',{bubbles:true}));}}, v);
+const rng = (label,v) => page.evaluate(({label,v})=>{const r=[...document.querySelectorAll('input[type=range]')].find(x=>x.getAttribute('aria-label')===label); if(r){const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; set.call(r,String(v)); r.dispatchEvent(new Event('input',{bubbles:true})); r.dispatchEvent(new Event('change',{bubbles:true}));}}, {label,v});
+await page.goto(url,{waitUntil:'load'}); await page.waitForSelector('#chase-babylon-canvas'); await sleep(2200);
+await page.click('button[title="Switcher"]'); await sleep(400);
+await page.getByRole('button',{name:'Add Webcam'}).click(); await page.waitForSelector('video'); await sleep(1200);
+await page.getByRole('button',{name:'CUT'}).click(); await sleep(700);
+await sel('presenterPlate'); await sleep(250); await sel('chromaKey'); await sleep(300);
+await page.getByRole('button',{name:'Auto'}).click(); await sleep(250);
+await rng('Similarity',0.16); await rng('Smoothness',0.1); await rng('Edge denoise',0.7); await rng('Black clip',0.12); await rng('White clip',0.9); await sleep(300);
+await page.screenshot({ path: `${out}/01-matte-calibration-controls.png` });
+// matte preview (clean edges)
+await page.getByRole('button',{name:'Show matte'}).click(); await sleep(250);
+await page.click('button[title="Builder"]'); await page.waitForSelector('#chase-babylon-canvas'); await sleep(3000);
+await vp('02-clean-matte.png');
+// matte off -> composited key
+await page.click('button[title="Switcher"]'); await sleep(250);
+await page.getByRole('button',{name:'Matte: ON'}).click().catch(()=>{}); await sleep(200);
+await page.click('button[title="Builder"]'); await page.waitForSelector('#chase-babylon-canvas'); await sleep(3000);
+await vp('03-clean-key-composited.png');
+fs.writeFileSync(`${out}/keying-matte.txt`, ['denoise=0.7 blackClip=0.12 whiteClip=0.9 similarity=0.16', '', '--- console ---', ...logs].join('\n'));
+await browser.close();
+console.log('keying-matte evidence ->', out);
