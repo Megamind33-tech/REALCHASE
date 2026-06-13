@@ -95,11 +95,21 @@ assertContains('src/components/shell/TopBar.tsx', 'data-testid="live-status"');
 assertContains('src/components/shell/TopBar.tsx', 'data-testid="record-status"');
 
 const outputPanel = read('src/components/shell/OutputPanel.tsx');
-if (/\bMeter\b/.test(outputPanel) || /rec-pulse|meter-fill|random/i.test(outputPanel)) {
-  fail('outputs surface contains a meter/animated/random-meter implementation without real audio state');
+// Fake/animated/random meters are forbidden. Real metering is allowed only via
+// the Web Audio AudioMeter component, and only driven by an actual audio track.
+if (/rec-pulse|meter-fill|Math\.random|setInterval/i.test(outputPanel)) {
+  fail('outputs surface contains an animated/random fake meter implementation');
+}
+if (/<AudioMeter\b/.test(outputPanel)) {
+  if (!outputPanel.includes("from '@/components/audio/AudioMeter'")) {
+    fail('outputs surface renders a meter that is not the real Web Audio AudioMeter');
+  }
+  if (!outputPanel.includes('getAudioTracks()')) {
+    fail('outputs surface shows meters without gating on a real audio track');
+  }
 }
 if (!outputPanel.includes('No real audio source connected')) {
-  fail('outputs surface does not expose the honest no-audio-source state');
+  fail('outputs surface does not expose the honest no-audio-source fallback state');
 }
 if (!outputPanel.includes('Streaming disabled until MediaMTX/output pipeline is added')) {
   fail('stream destination panel does not explain disabled streaming state');
