@@ -14,6 +14,7 @@ import { useShell } from './ShellContext';
 interface EditorBridgeValue {
   engine: StudioEngine | null;
   initCanvas: (canvas: HTMLCanvasElement) => void;
+  setActive: (active: boolean) => void;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
   importGltfFiles: (files: File[]) => Promise<number>;
@@ -102,6 +103,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engine.setTransformMode(state.transformMode);
   }, [state.transformMode, state.engineReady]);
 
+  const setActive = useCallback((active: boolean) => {
+    engineRef.current?.setActive(active);
+  }, []);
+
   const addObject = useCallback((objectId: string) => {
     return engineRef.current?.addSceneObject(objectId) ?? false;
   }, []);
@@ -123,6 +128,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
       value={{
         engine,
         initCanvas,
+        setActive,
         addObject,
         loadPack,
         importGltfFiles,

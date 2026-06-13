@@ -20,6 +20,23 @@ export default defineConfig({
     minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        // Split the heavy Babylon stack and React into separate, cacheable
+        // chunks instead of one ~7 MB bundle — improves startup parse time and
+        // lets the engine code cache across app updates.
+        manualChunks: (id) => {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('babylonjs-editor-tools')) return 'editor-tools';
+          if (id.includes('@babylonjs/loaders')) return 'babylon-loaders';
+          if (id.includes('@babylonjs/materials')) return 'babylon-materials';
+          if (id.includes('@babylonjs/gui')) return 'babylon-gui';
+          if (id.includes('@babylonjs/core')) return 'babylon-core';
+          if (id.includes('react') || id.includes('scheduler')) return 'react-vendor';
+          return 'vendor';
+        },
+      },
+    },
   },
   optimizeDeps: {
     include: ['@babylonjs/core', '@babylonjs/loaders', '@babylonjs/materials'],
