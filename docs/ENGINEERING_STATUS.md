@@ -3,14 +3,15 @@
 ## Milestone 2 Completion Update (2026-06-14)
 
 - **Branch:** `chase/fork-audit`
-- **Latest implementation commit:** `c778e73` (`729cc78` is the Source Manager backport)
+- **Latest implementation commit:** `e9afea4` (`729cc78` is the Source Manager backport)
 - **Remote sync:** Fast-forwarded from `eaa60a3` to `ed0f468` before implementation. Pre-sync work is preserved on `codex/safety-pre-sync-20260614-074822` at `36db710`.
 - **Changed:** Added real video-file, image-file, and screen-capture sources; retained real webcam capture; added editable source names, honest unavailable states, project restore typing, and explicit runtime cleanup for tracks, object URLs, media elements, animation frames, and listeners.
 - **Works now:** Image and recorded WebM fixtures decode to live tracks, appear in Preview, CUT to Program, rename, remove, and release their media elements. All implemented source types share the existing Babylon placement/keying path.
 - **Still partial:** Restored local files require the operator to choose the file again because browser file handles and media bytes are intentionally not serialized. Interactive screen-picker success still needs a headed rehearsal; the automated suite verifies the honest unsupported path.
 - **Blocked:** `vite build` remained silent and exceeded a 304.5 second bound on this OneDrive workstation. Direct TypeScript validation and the dev runtime pass. No generic `lint`, `typecheck`, or `test` scripts exist in `package.json`.
 - **Commands run:** direct `tsc -b --pretty false` (pass), `tests/source-manager-smoke.mjs` (pass), `tests/anti-demo-smoke.mjs` (pass), `tests/freed.test.mjs` (pass), in-app browser smoke (pass), `vite build` (timeout).
-- **Exact next patch:** Milestone 7 output preview: expose the composited Babylon canvas in Outputs, add recording duration/byte/bitrate telemetry, then add honest WebM/H.264/ProRes capability selection without claiming unavailable codecs.
+- **M7 now works:** Outputs shows the real Babylon canvas composite; recording reports duration/bytes/bitrate/MIME; WebM is available; native H.264/MP4 is enabled only when MediaRecorder reports support; ProRes is disabled with an explicit native-ffmpeg requirement.
+- **Exact next patch:** Implement the native Tauri/ffmpeg ProRes bridge, then resolve the production Vite build timeout and validate a desktop recording.
 
 **Report Date:** June 14, 2026  
 **Current Build:** v0.1.0  

@@ -19,6 +19,18 @@
 
 **Residual risk:** A headed operator rehearsal is still required for the native screen-selection prompt and real camera permissions. The production Vite bundle timed out on the current OneDrive workstation; TypeScript and dev-runtime tests pass.
 
+## Verified M7 Output Preview Slice (2026-06-14)
+
+**Implementation commit:** `e9afea4`
+
+- [x] Show the real composited Babylon canvas in the Outputs panel.
+- [x] Include scene sources and Babylon broadcast graphics in that preview/capture path.
+- [x] Report recording duration, emitted bytes, bitrate, and negotiated MIME type.
+- [x] Record WebM through MediaRecorder.
+- [x] Enable H.264/MP4 only when the current runtime reports native support.
+- [x] Disable ProRes honestly until a native Tauri/ffmpeg bridge exists.
+- [x] Save screenshot and MP4 evidence under `docs/evidence/phase-7/output-preview`.
+
 **Scope:** All user-facing features and internal systems  
 **Format:** Feature → Status → Working Details → Missing/Broken Details → Acceptance Criteria for "done"
 

@@ -4,11 +4,12 @@
 ## Resume Point (2026-06-14)
 
 - **Branch:** `chase/fork-audit`
-- **Latest implementation commit:** `c778e73`
+- **Latest implementation commit:** `e9afea4`
 - **M2 backport:** COMPLETE at `729cc78`; real webcam, video file, image, and screen source paths are wired to Preview/Program and the Babylon scene.
 - **Verification:** TypeScript, source-manager browser smoke, anti-demo smoke, FreeD regression, and in-app browser UI smoke pass.
 - **Known blocker:** Production `vite build` exceeded 304.5 seconds without output on this OneDrive workstation. Do not report the production bundle as passing until this is resolved or reproduced elsewhere.
-- **Next patch:** M7 composite output preview and recording telemetry, followed by truthful codec capability selection/fallback.
+- **M7 progress:** Composite output preview, recording telemetry, WebM, and capability-gated native H.264/MP4 are implemented. ProRes remains honestly unavailable.
+- **Next patch:** Add the native Tauri/ffmpeg bridge required for ProRes, then resolve the production Vite build timeout and run a desktop recording rehearsal.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  
 **Approach:** Milestone-based; each completes a distinct value delivery
