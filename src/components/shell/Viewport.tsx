@@ -6,6 +6,7 @@ import { Button, IconButton } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { ViewportCanvas } from '@/components/viewport/ViewportCanvas';
+import { SwitcherPanel } from '@/components/shell/SwitcherPanel';
 import type { QualityMode, TransformMode } from '@/context/shellTypes';
 
 const QUALITY_MODES: QualityMode[] = ['low', 'balanced', 'high'];
@@ -19,6 +20,10 @@ const TRANSFORM_MODES: { id: TransformMode; icon: typeof Box; label: string }[] 
 export function Viewport() {
   const { state, dispatch } = useShell();
   const { engine } = useEditorBridge();
+
+  if (state.activeModule === 'switcher') {
+    return <SwitcherPanel />;
+  }
 
   if (state.activeModule !== 'builder') {
     return (
