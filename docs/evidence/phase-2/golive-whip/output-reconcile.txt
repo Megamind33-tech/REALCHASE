@@ -1,0 +1,10 @@
+Output panel reconciled to the real WHIP session (no more "Requires streaming engine" placeholder):
+  Program Output tile, off air : Program OutputOff airIdle — go on air from the toolbar.
+  Program Output tile, on air  : Program Output● ON AIR 0:02Publishing the Program output over WebRTC/WHIP.
+  Program Output tile, after   : Program OutputOff airIdle — go on air from the toolbar.
+
+  MediaMTX path "chase" ready while panel showed on-air: true
+  source: webRTCSession, tracks: ["Opus","VP8"], bytesReceived: 11499
+
+-> The Output panel mirrors the genuine publish state; the named per-platform
+   destinations remain honestly marked "Per-destination publishing not wired".
