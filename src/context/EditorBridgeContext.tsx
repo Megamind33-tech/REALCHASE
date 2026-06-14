@@ -24,6 +24,7 @@ interface EditorBridgeValue {
   trackingLinked: boolean;
   trackingLabel: string;
   captureOutputStream: (fps?: number) => MediaStream | null;
+  captureCameraThumbnail: (cameraId: CameraId, width?: number) => Promise<string | null>;
   sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
@@ -184,6 +185,8 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
 
   const captureOutputStream = useCallback((fps?: number) => engineRef.current?.captureOutputStream(fps) ?? null, []);
 
+  const captureCameraThumbnail = useCallback((cameraId: CameraId, width?: number) => engineRef.current?.captureCameraThumbnail(cameraId, width) ?? Promise.resolve(null), []);
+
   const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
 
   const addObject = useCallback((objectId: string) => {
@@ -272,6 +275,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         trackingLinked: trackingStatus === 'connected' || trackingStatus === 'connecting',
         trackingLabel: TRACKING_LABELS[trackingStatus],
         captureOutputStream,
+        captureCameraThumbnail,
         sampleKeyColor,
         addObject,
         loadPack,

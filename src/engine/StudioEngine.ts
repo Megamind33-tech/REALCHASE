@@ -19,6 +19,7 @@ import {
   ShaderMaterial,
   StandardMaterial,
   Texture,
+  Tools,
   TransformNode,
   Vector2,
   Vector3,
@@ -1477,6 +1478,28 @@ export class StudioEngine {
   /** The canvas this engine is bound to, or null before init/after dispose. */
   getCanvas(): HTMLCanvasElement | null {
     return this.canvas;
+  }
+
+  /**
+   * Render a real thumbnail of one studio camera's actual viewpoint, off-screen,
+   * and return it as a JPEG data URL. Uses a render-target screenshot so the live
+   * viewport never flickers. Callers refresh these gently (round-robin) to keep
+   * the camera strip authentic without costing frame rate.
+   */
+  async captureCameraThumbnail(cameraId: CameraId, width = 192): Promise<string | null> {
+    if (!this.engine || !this.scene) return null;
+    const cam = this.cameras.get(cameraId);
+    if (!cam) return null;
+    const height = Math.round((width * 9) / 16);
+    const wasEnabled = cam.isEnabled();
+    if (!wasEnabled) cam.setEnabled(true); // disabled (inactive) cameras still render to an explicit target
+    try {
+      return await Tools.CreateScreenshotUsingRenderTargetAsync(this.engine, cam, { width, height });
+    } catch {
+      return null;
+    } finally {
+      if (!wasEnabled) cam.setEnabled(false);
+    }
   }
 
   /**
