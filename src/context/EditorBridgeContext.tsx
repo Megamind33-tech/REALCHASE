@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { StudioEngine, type TrackingStatus } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
-import type { ImportedAsset, SerializedAsset, AssetTransform } from '@/integrations/render-engine/types';
+import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -30,10 +30,19 @@ interface EditorBridgeValue {
   importGltfFiles: (files: File[]) => Promise<number>;
   importAsset: (file: File) => Promise<ImportedAsset>;
   setAssetTransform: (id: string, transform: Partial<AssetTransform>) => void;
+  renameAsset: (id: string, name: string) => void;
+  duplicateAsset: (id: string) => Promise<ImportedAsset | null>;
   removeAsset: (id: string) => void;
-  serializeAssets: () => SerializedAsset[];
-  restoreAssets: (assets: SerializedAsset[]) => Promise<{ restored: number; skipped: number }>;
+  setAssetReferenceMode: (id: string, on: boolean) => void;
+  setAssetReferencePath: (id: string, path: string) => void;
+  relinkAsset: (id: string, file: File) => Promise<void>;
+  createGroup: (ids: string[], name: string) => string | null;
+  removeGroup: (id: string) => void;
+  renameGroup: (id: string, name: string) => void;
+  serializeScene: () => SceneSnapshot;
+  restoreScene: (snapshot: SceneSnapshot) => Promise<{ restored: number; missing: number; groups: number }>;
   assets: ImportedAsset[];
+  groups: AssetGroup[];
   sceneNodes: SceneNodeInfo[];
 }
 
@@ -52,6 +61,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const [engine, setEngine] = useState<StudioEngine | null>(null);
   const [sceneNodes, setSceneNodes] = useState<SceneNodeInfo[]>([]);
   const [assets, setAssets] = useState<ImportedAsset[]>([]);
+  const [groups, setGroups] = useState<AssetGroup[]>([]);
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | 'idle'>('idle');
   const { state, dispatch } = useShell();
 
@@ -88,9 +98,23 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'assets') {
         setAssets(event.assets);
+        setGroups(event.groups);
       }
       if (event.type === 'asset-warning') {
         dispatch({ type: 'SHOW_TOAST', message: event.message });
+      }
+    });
+    // External-asset resolver: fetch a referenced file by URL/path when a project
+    // is reloaded. Real in both worlds — a served asset URL in the browser, a
+    // filesystem path in the desktop build. Returns null (→ honest missing state)
+    // when the file can't be found.
+    instance.setExternalResolver(async (ref) => {
+      try {
+        const res = await fetch(ref, { cache: 'no-store' });
+        if (!res.ok) return null;
+        return new Uint8Array(await res.arrayBuffer());
+      } catch {
+        return null;
       }
     });
     instance.init(canvas);
@@ -188,16 +212,50 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engineRef.current?.setAssetTransform(id, transform);
   }, []);
 
+  const renameAsset = useCallback((id: string, name: string) => {
+    engineRef.current?.renameAsset(id, name);
+  }, []);
+
+  const duplicateAsset = useCallback((id: string) => {
+    const engine = engineRef.current;
+    if (!engine) return Promise.resolve(null);
+    return engine.duplicateAsset(id);
+  }, []);
+
   const removeAsset = useCallback((id: string) => {
     engineRef.current?.removeAsset(id);
   }, []);
 
-  const serializeAssets = useCallback(() => engineRef.current?.serializeAssets() ?? [], []);
+  const setAssetReferenceMode = useCallback((id: string, on: boolean) => {
+    engineRef.current?.setAssetReferenceMode(id, on);
+  }, []);
 
-  const restoreAssets = useCallback((list: SerializedAsset[]) => {
+  const setAssetReferencePath = useCallback((id: string, path: string) => {
+    engineRef.current?.setAssetReferencePath(id, path);
+  }, []);
+
+  const relinkAsset = useCallback((id: string, file: File) => {
     const engine = engineRef.current;
-    if (!engine) return Promise.resolve({ restored: 0, skipped: 0 });
-    return engine.restoreAssets(list);
+    if (!engine) return Promise.resolve();
+    return engine.relinkAsset(id, file);
+  }, []);
+
+  const createGroup = useCallback((ids: string[], name: string) => engineRef.current?.createGroup(ids, name) ?? null, []);
+
+  const removeGroup = useCallback((id: string) => {
+    engineRef.current?.removeGroup(id);
+  }, []);
+
+  const renameGroup = useCallback((id: string, name: string) => {
+    engineRef.current?.renameGroup(id, name);
+  }, []);
+
+  const serializeScene = useCallback(() => engineRef.current?.serializeScene() ?? { assets: [], groups: [] }, []);
+
+  const restoreScene = useCallback((snapshot: SceneSnapshot) => {
+    const engine = engineRef.current;
+    if (!engine) return Promise.resolve({ restored: 0, missing: 0, groups: 0 });
+    return engine.restoreScene(snapshot);
   }, []);
 
   return (
@@ -220,10 +278,19 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         importGltfFiles,
         importAsset,
         setAssetTransform,
+        renameAsset,
+        duplicateAsset,
         removeAsset,
-        serializeAssets,
-        restoreAssets,
+        setAssetReferenceMode,
+        setAssetReferencePath,
+        relinkAsset,
+        createGroup,
+        removeGroup,
+        renameGroup,
+        serializeScene,
+        restoreScene,
         assets,
+        groups,
         sceneNodes,
       }}
     >
@@ -244,4 +311,8 @@ export function useSceneNodes() {
 
 export function useImportedAssets() {
   return useEditorBridge().assets;
+}
+
+export function useAssetGroups() {
+  return useEditorBridge().groups;
 }

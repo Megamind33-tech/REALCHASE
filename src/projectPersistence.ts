@@ -1,6 +1,8 @@
 import { DEFAULT_KEYING_SETTINGS, type Source } from '@/sources/sourceTypes';
 import type { ShellState } from '@/context/shellTypes';
-import type { SerializedAsset } from '@/integrations/render-engine/types';
+import type { SceneSnapshot } from '@/integrations/render-engine/types';
+
+const EMPTY_SCENE: SceneSnapshot = { assets: [], groups: [] };
 
 export interface ChaseProjectFile {
   schemaVersion: 1;
@@ -8,8 +10,8 @@ export interface ChaseProjectFile {
   createdAt: string;
   updatedAt: string;
   scene: { activeSetId: string; cameraView: string; placements: Array<Record<string, unknown>> };
-  /** Imported 3D assets and their stage placement. */
-  assets: SerializedAsset[];
+  /** Imported 3D assets + groups (the multi-asset studio scene). */
+  assetScene: SceneSnapshot;
   sources: Array<Record<string, unknown>>;
   programSourceId: string | null;
   previewSourceId: string | null;
@@ -17,7 +19,7 @@ export interface ChaseProjectFile {
   ui: Record<string, unknown>;
 }
 
-export function buildProjectFile(shell: ShellState, sources: Source[], previewId: string | null, programId: string | null, assets: SerializedAsset[] = []): ChaseProjectFile {
+export function buildProjectFile(shell: ShellState, sources: Source[], previewId: string | null, programId: string | null, assetScene: SceneSnapshot = EMPTY_SCENE): ChaseProjectFile {
   const now = new Date().toISOString();
   return {
     schemaVersion: 1,
@@ -29,7 +31,7 @@ export function buildProjectFile(shell: ShellState, sources: Source[], previewId
       cameraView: shell.activeCameraId,
       placements: sources.map((s) => ({ sourceId: s.id, mode: s.placement, screenTargetId: s.screenTargetId ?? null })),
     },
-    assets,
+    assetScene,
     sources: sources.map((s) => ({
       id: s.id,
       name: s.name,
@@ -48,10 +50,13 @@ export function buildProjectFile(shell: ShellState, sources: Source[], previewId
   };
 }
 
-export function parseProjectFile(text: string): { sources: Source[]; previewId: string | null; programId: string | null; projectName: string; assets: SerializedAsset[] } {
-  const file = JSON.parse(text) as ChaseProjectFile;
+export function parseProjectFile(text: string): { sources: Source[]; previewId: string | null; programId: string | null; projectName: string; assetScene: SceneSnapshot } {
+  const file = JSON.parse(text) as ChaseProjectFile & { assets?: unknown };
   if (file.schemaVersion !== 1 || !Array.isArray(file.sources) || !file.scene) throw new Error('Invalid .chaseproj schema');
-  const assets = Array.isArray(file.assets) ? file.assets : [];
+  // Back-compat: PR #23 wrote a flat `assets` array; PR #24+ writes `assetScene`.
+  const assetScene: SceneSnapshot = file.assetScene && Array.isArray(file.assetScene.assets)
+    ? { assets: file.assetScene.assets, groups: Array.isArray(file.assetScene.groups) ? file.assetScene.groups : [] }
+    : { assets: Array.isArray(file.assets) ? (file.assets as SceneSnapshot['assets']) : [], groups: [] };
   const sources = file.sources.map((raw) => ({
     id: String(raw.id),
     name: String(raw.name ?? 'Restored Source'),
@@ -65,7 +70,7 @@ export function parseProjectFile(text: string): { sources: Source[]; previewId: 
     keying: typeof raw.keying === 'object' && raw.keying ? { ...DEFAULT_KEYING_SETTINGS, ...raw.keying } : DEFAULT_KEYING_SETTINGS,
     needsReconnect: true,
   })) satisfies Source[];
-  return { sources, previewId: file.previewSourceId, programId: file.programSourceId, projectName: file.projectName, assets };
+  return { sources, previewId: file.previewSourceId, programId: file.programSourceId, projectName: file.projectName, assetScene };
 }
 
 export async function saveProjectFile(project: ChaseProjectFile): Promise<string> {

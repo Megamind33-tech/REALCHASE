@@ -17,7 +17,7 @@ export function TopBar() {
     capturing, canRecord, recordLabel, toggleCapture,
     onAir, canStream, liveLabel, streamError, toggleAir,
   } = useSources();
-  const { serializeAssets, restoreAssets } = useEditorBridge();
+  const { serializeScene, restoreScene } = useEditorBridge();
   const openRef = useRef<HTMLInputElement>(null);
   const [ingestUrl, setIngestUrl] = useState(DEFAULT_INGEST_URL);
   const { metrics } = state;
@@ -29,7 +29,7 @@ export function TopBar() {
 
   const saveProject = async () => {
     try {
-      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId, serializeAssets()));
+      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId, serializeScene()));
       dispatch({ type: 'SHOW_TOAST', message: path === 'cancelled' ? 'Save Project cancelled' : `Saved project: ${path}` });
     } catch (error) {
       dispatch({ type: 'SHOW_TOAST', message: `Save Project failed: ${error instanceof Error ? error.message : 'unknown error'}` });
@@ -44,9 +44,10 @@ export function TopBar() {
     try {
       const restored = parseProjectFile(await file.text());
       restoreProjectSources(restored.sources, restored.previewId, restored.programId);
-      const { restored: ok, skipped } = await restoreAssets(restored.assets);
-      const assetNote = restored.assets.length
-        ? ` Restored ${ok} asset${ok === 1 ? '' : 's'}${skipped ? `, ${skipped} need re-import` : ''}.`
+      const { restored: ok, missing, groups } = await restoreScene(restored.assetScene);
+      const total = restored.assetScene.assets.length;
+      const assetNote = total
+        ? ` Restored ${ok}/${total} asset${total === 1 ? '' : 's'}${groups ? ` and ${groups} group${groups === 1 ? '' : 's'}` : ''}${missing ? `, ${missing} external file${missing === 1 ? '' : 's'} missing` : ''}.`
         : '';
       dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}.${assetNote} Live sources need reconnection.` });
     } catch (error) {

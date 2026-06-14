@@ -41,11 +41,12 @@ import { LAYER_TO_OBJECT } from './sceneRegistry';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
 import { DEFAULT_KEYING_SETTINGS, type KeyingSettings, type PlacementMode } from '@/sources/sourceTypes';
 import {
-  validateAssetFile, assertNotCorrupt, assessHeaviness, canEmbed,
+  validateAssetFile, assertNotCorrupt, assessHeaviness, effectiveEmbedded,
   bytesToBase64, base64ToBytes,
 } from '@/integrations/render-engine/assetImport';
 import {
-  AssetImportError, type ImportedAsset, type SerializedAsset, type AssetTransform,
+  AssetImportError, type ImportedAsset, type AssetGroup, type SerializedAsset,
+  type SerializedGroup, type SceneSnapshot, type AssetTransform, type ExternalResolver,
 } from '@/integrations/render-engine/types';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
@@ -58,16 +59,30 @@ export type StudioEngineEvent =
   | { type: 'selected'; objectId: string | null }
   | { type: 'scene-graph'; nodes: SceneNodeInfo[] }
   | { type: 'tracking'; status: TrackingStatus; message?: string }
-  | { type: 'assets'; assets: ImportedAsset[] }
+  | { type: 'assets'; assets: ImportedAsset[]; groups: AssetGroup[] }
   | { type: 'asset-warning'; message: string }
   | { type: 'error'; message: string };
 
-interface ImportedAssetRecord {
+interface AssetRecord {
   id: string;
   name: string;
   format: 'glb' | 'gltf';
   fileBytes: number;
-  bytes: Uint8Array;
+  /** Original bytes, kept for save/duplicate; null when the asset is missing. */
+  bytes: Uint8Array | null;
+  referenceMode: boolean;
+  referencePath: string;
+  missing: boolean;
+  /** Cached so missing assets (which have no scene node) still report fully. */
+  transform: AssetTransform;
+  meshCount: number;
+  vertexCount: number;
+  groupId: string | null;
+}
+
+interface GroupRecord {
+  id: string;
+  name: string;
 }
 
 // Minimal unlit textured shader for the Program media plane. Babylon's
@@ -198,7 +213,11 @@ export class StudioEngine {
   // Imported 3D assets (GLB/glTF) the operator has brought into the stage. The
   // original bytes are kept so the placement can be saved into a project and
   // restored on reload.
-  private importedAssets = new Map<string, ImportedAssetRecord>();
+  private importedAssets = new Map<string, AssetRecord>();
+  // Named groups of imported assets (each backed by a TransformNode in the scene).
+  private assetGroups = new Map<string, GroupRecord>();
+  // Resolves external (non-embedded) asset bytes on reload; set by the app.
+  private externalResolver: ExternalResolver | null = null;
   // Program media (live source rendered as a separate, selectable scene object).
   private programPlane: Mesh | null = null;
   private programTexture: VideoTexture | null = null;
@@ -357,7 +376,11 @@ export class StudioEngine {
       .replace(/(^-|-$)/g, '') || 'node';
     let id = base;
     let suffix = 2;
-    while (this.findMeshById(id)) {
+    // Avoid scene-node ids AND reserved asset/group ids — missing-asset stubs
+    // hold an id without a scene node, so checking nodes alone would let a fresh
+    // import clobber the stub on reload.
+    const taken = (candidate: string) => Boolean(this.findMeshById(candidate)) || this.importedAssets.has(candidate) || this.assetGroups.has(candidate);
+    while (taken(id)) {
       id = `${base}-${suffix}`;
       suffix += 1;
     }
@@ -471,7 +494,12 @@ export class StudioEngine {
 
     const newMeshes = this.scene.meshes.filter((m) => !beforeMeshes.has(m));
     const vertexCount = newMeshes.reduce((sum, m) => sum + (m.getTotalVertices?.() ?? 0), 0);
-    this.importedAssets.set(rootId, { id: rootId, name: baseName, format, fileBytes: file.size, bytes });
+    const meshCount = newMeshes.filter((m) => (m.getTotalVertices?.() ?? 0) > 0).length;
+    this.importedAssets.set(rootId, {
+      id: rootId, name: baseName, format, fileBytes: file.size, bytes,
+      referenceMode: false, referencePath: file.name, missing: false,
+      transform: this.readTransform(rootId), meshCount, vertexCount, groupId: null,
+    });
 
     this.emitSceneGraph();
     this.selectObject(rootId);
@@ -481,27 +509,35 @@ export class StudioEngine {
     if (descriptor.heavy) {
       this.emit({ type: 'asset-warning', message: `Heavy asset "${descriptor.name}" (${descriptor.heavyReason}) — performance may drop.` });
     }
-    return { ...descriptor, vertexCount };
+    return descriptor;
   }
 
   /** Build the engine-neutral descriptor for an imported asset id. */
   private describeAsset(id: string): ImportedAsset | null {
     const rec = this.importedAssets.get(id);
+    if (!rec) return null;
     const node = this.findMeshById(id);
-    if (!rec || !node) return null;
-    const meshes = this.scene?.meshes.filter((m) => this.rootOf(m) === id) ?? [];
-    const vertexCount = meshes.reduce((sum, m) => sum + (m.getTotalVertices?.() ?? 0), 0);
+    // Missing assets have no scene node; report from the cached record.
+    const live = !rec.missing && node;
+    const meshes = live ? (this.scene?.meshes.filter((m) => this.rootOf(m) === id) ?? []) : [];
+    const vertexCount = live ? meshes.reduce((sum, m) => sum + (m.getTotalVertices?.() ?? 0), 0) : rec.vertexCount;
+    const meshCount = live ? meshes.filter((m) => (m.getTotalVertices?.() ?? 0) > 0).length : rec.meshCount;
     const heaviness = assessHeaviness({ fileBytes: rec.fileBytes, vertexCount });
     return {
       id,
       name: rec.name,
       format: rec.format,
       fileBytes: rec.fileBytes,
-      meshCount: meshes.filter((m) => (m.getTotalVertices?.() ?? 0) > 0).length,
+      meshCount,
       vertexCount,
-      transform: this.readTransform(id),
+      transform: live ? this.readTransform(id) : rec.transform,
       heavy: heaviness.heavy,
       heavyReason: heaviness.reason,
+      embedded: effectiveEmbedded(rec.referenceMode, rec.fileBytes),
+      referenceMode: rec.referenceMode,
+      referencePath: rec.referencePath,
+      missing: rec.missing,
+      groupId: rec.groupId,
     };
   }
 
@@ -527,7 +563,14 @@ export class StudioEngine {
     };
   }
 
-  /** Apply a transform to an imported asset root (inspector numeric edits). */
+  private applyTransformToNode(node: AbstractMesh | TransformNode, t: AssetTransform) {
+    node.position.set(t.position[0], t.position[1], t.position[2]);
+    node.rotationQuaternion = null;
+    node.rotation.set(t.rotation[0], t.rotation[1], t.rotation[2]);
+    node.scaling.set(t.scaling[0], t.scaling[1], t.scaling[2]);
+  }
+
+  /** Apply a transform to an imported asset root or a group node. */
   setAssetTransform(id: string, t: Partial<AssetTransform>) {
     const node = this.findMeshById(id);
     if (!node) return;
@@ -535,17 +578,141 @@ export class StudioEngine {
     if (t.position) node.position.set(t.position[0], t.position[1], t.position[2]);
     if (t.rotation) { node.rotationQuaternion = null; node.rotation.set(t.rotation[0], t.rotation[1], t.rotation[2]); }
     if (t.scaling) node.scaling.set(t.scaling[0], t.scaling[1], t.scaling[2]);
+    const rec = this.importedAssets.get(id);
+    if (rec) rec.transform = this.readTransform(id);
+    this.emitAssets();
+  }
+
+  /** Rename an imported asset (display name only; id stays stable). */
+  renameAsset(id: string, name: string) {
+    const rec = this.importedAssets.get(id);
+    if (!rec) return;
+    rec.name = name.trim() || rec.name;
+    const node = this.findMeshById(id);
+    if (node?.metadata) node.metadata.displayName = rec.name;
+    this.emitAssets();
+  }
+
+  renameGroup(id: string, name: string) {
+    const g = this.assetGroups.get(id);
+    if (!g) return;
+    g.name = name.trim() || g.name;
+    const node = this.findMeshById(id);
+    if (node?.metadata) node.metadata.displayName = g.name;
+    this.emitAssets();
+  }
+
+  /** Duplicate an imported asset, offset slightly so the copy is visible. */
+  async duplicateAsset(id: string): Promise<ImportedAsset | null> {
+    const rec = this.importedAssets.get(id);
+    if (!rec || !rec.bytes) return null; // can't duplicate a missing asset
+    const base = this.readTransform(id);
+    const file = new File([rec.bytes], `${rec.name}.${rec.format}`, { type: 'model/gltf-binary' });
+    const dup = await this.importAsset(file);
+    this.setAssetTransform(dup.id, {
+      position: [base.position[0] + 0.6, base.position[1], base.position[2] + 0.6],
+      rotation: base.rotation,
+      scaling: base.scaling,
+    });
+    this.renameAsset(dup.id, `${rec.name} copy`);
+    const dupRec = this.importedAssets.get(dup.id);
+    if (dupRec) { dupRec.referenceMode = rec.referenceMode; dupRec.referencePath = rec.referencePath; }
+    this.selectObject(dup.id);
+    this.emitAssets();
+    return this.describeAsset(dup.id);
+  }
+
+  setAssetReferenceMode(id: string, on: boolean) {
+    const rec = this.importedAssets.get(id);
+    if (!rec) return;
+    rec.referenceMode = on;
+    this.emitAssets();
+  }
+
+  setAssetReferencePath(id: string, path: string) {
+    const rec = this.importedAssets.get(id);
+    if (!rec) return;
+    rec.referencePath = path;
+    this.emitAssets();
+  }
+
+  setExternalResolver(resolver: ExternalResolver | null) {
+    this.externalResolver = resolver;
+  }
+
+  /** Re-provide the file for a missing external asset, restoring its placement. */
+  async relinkAsset(id: string, file: File) {
+    const rec = this.importedAssets.get(id);
+    if (!rec) return;
+    const saved = { name: rec.name, transform: rec.transform, groupId: rec.groupId, referencePath: rec.referencePath };
+    const descriptor = await this.importAsset(file);
+    if (descriptor.id !== id) {
+      this.importedAssets.delete(id);
+      this.renameAssetId(descriptor.id, id);
+    }
+    const newRec = this.importedAssets.get(id);
+    if (newRec) {
+      newRec.name = saved.name; newRec.referenceMode = true; newRec.referencePath = saved.referencePath;
+      newRec.missing = false; newRec.groupId = saved.groupId;
+    }
+    const node = this.findMeshById(id);
+    if (node?.metadata) node.metadata.displayName = saved.name;
+    if (saved.groupId) { const g = this.findMeshById(saved.groupId); if (g && node) node.setParent(g); }
+    this.setAssetTransform(id, saved.transform);
+    this.emitSceneGraph();
     this.emitAssets();
   }
 
   /** Remove an imported asset and its meshes from the stage. */
   removeAsset(id: string) {
+    const rec = this.importedAssets.get(id);
     const node = this.findMeshById(id);
     if (node) {
       const subtree = [node, ...node.getChildren((): boolean => true, false)] as Array<AbstractMesh | TransformNode>;
       subtree.forEach((n) => { if (!n.isDisposed()) n.dispose(); });
     }
     this.importedAssets.delete(id);
+    // Drop a group that has just lost its last member.
+    if (rec?.groupId && ![...this.importedAssets.values()].some((r) => r.groupId === rec.groupId)) {
+      this.removeGroup(rec.groupId);
+    }
+    if (this.selectedId === id) this.selectObject('desk');
+    this.emitSceneGraph();
+    this.emitAssets();
+  }
+
+  /** Group several imported assets under a new named transform node. */
+  createGroup(ids: string[], name: string): string | null {
+    if (!this.scene || ids.length === 0) return null;
+    const groupId = this.createUniqueNodeId(name || 'group');
+    const groupName = name.trim() || 'Group';
+    const node = new TransformNode(groupName, this.scene);
+    node.metadata = { chaseId: groupId, displayName: groupName, isGroup: true };
+    for (const childId of ids) {
+      const childNode = this.findMeshById(childId);
+      const rec = this.importedAssets.get(childId);
+      if (childNode && rec) {
+        childNode.setParent(node); // preserves world transform; child local becomes group-relative
+        rec.groupId = groupId;
+      }
+    }
+    this.assetGroups.set(groupId, { id: groupId, name: groupName });
+    this.emitSceneGraph();
+    this.selectObject(groupId);
+    this.emitAssets();
+    return groupId;
+  }
+
+  /** Disband a group; children keep their world placement. */
+  removeGroup(id: string) {
+    const node = this.findMeshById(id);
+    if (node) {
+      (node.getChildren((): boolean => true, true) as Array<AbstractMesh | TransformNode>)
+        .forEach((c) => c.setParent(null));
+      node.dispose();
+    }
+    this.importedAssets.forEach((rec) => { if (rec.groupId === id) rec.groupId = null; });
+    this.assetGroups.delete(id);
     if (this.selectedId === id) this.selectObject('desk');
     this.emitSceneGraph();
     this.emitAssets();
@@ -555,56 +722,92 @@ export class StudioEngine {
     return [...this.importedAssets.keys()].map((id) => this.describeAsset(id)).filter((a): a is ImportedAsset => a !== null);
   }
 
+  getGroups(): AssetGroup[] {
+    return [...this.assetGroups.keys()].map((id) => this.describeGroup(id)).filter((g): g is AssetGroup => g !== null);
+  }
+
+  private describeGroup(id: string): AssetGroup | null {
+    const g = this.assetGroups.get(id);
+    if (!g) return null;
+    const childIds = [...this.importedAssets.values()].filter((r) => r.groupId === id).map((r) => r.id);
+    return { id, name: g.name, transform: this.readTransform(id), childIds };
+  }
+
   getAssetInfo(id: string): ImportedAsset | null {
     return this.describeAsset(id);
   }
 
   private emitAssets() {
-    this.emit({ type: 'assets', assets: this.getImportedAssets() });
+    this.emit({ type: 'assets', assets: this.getImportedAssets(), groups: this.getGroups() });
   }
 
-  /** Serialize imported assets for a project file (embeds small geometry). */
-  serializeAssets(): SerializedAsset[] {
-    return [...this.importedAssets.values()].map((rec) => {
-      const embedded = canEmbed(rec.fileBytes);
+  /** Serialize the imported-scene layer (assets + groups) for a project file. */
+  serializeScene(): SceneSnapshot {
+    const assets: SerializedAsset[] = [...this.importedAssets.values()].map((rec) => {
+      const embedded = effectiveEmbedded(rec.referenceMode, rec.fileBytes);
+      const transform = rec.missing ? rec.transform : this.readTransform(rec.id);
       return {
-        id: rec.id,
-        name: rec.name,
-        format: rec.format,
-        fileBytes: rec.fileBytes,
-        transform: this.readTransform(rec.id),
-        data: embedded ? bytesToBase64(rec.bytes) : null,
-        embedded,
+        id: rec.id, name: rec.name, format: rec.format, fileBytes: rec.fileBytes,
+        meshCount: rec.meshCount, vertexCount: rec.vertexCount, transform,
+        data: embedded && rec.bytes ? bytesToBase64(rec.bytes) : null,
+        embedded, referenceMode: rec.referenceMode, referencePath: rec.referencePath,
+        missing: rec.missing, groupId: rec.groupId,
       };
     });
+    const groups: SerializedGroup[] = this.getGroups().map((g) => ({ id: g.id, name: g.name, transform: g.transform, childIds: g.childIds }));
+    return { assets, groups };
   }
 
-  /** Restore imported assets from a project file. Returns counts for the UI. */
-  async restoreAssets(assets: SerializedAsset[]): Promise<{ restored: number; skipped: number }> {
-    if (!this.scene) return { restored: 0, skipped: 0 };
-    // Clear any currently-imported assets first so reload is deterministic.
+  /** Restore the imported-scene layer. Embedded assets come from the project;
+   *  external ones are resolved, and unresolved files become honest stubs. */
+  async restoreScene(snapshot: SceneSnapshot): Promise<{ restored: number; missing: number; groups: number }> {
+    if (!this.scene) return { restored: 0, missing: 0, groups: 0 };
+    [...this.assetGroups.keys()].forEach((id) => this.removeGroup(id));
     [...this.importedAssets.keys()].forEach((id) => this.removeAsset(id));
+
+    // 1) Recreate group nodes first (so children can be parented into them).
+    for (const g of snapshot.groups ?? []) {
+      const node = new TransformNode(g.name, this.scene);
+      node.metadata = { chaseId: g.id, displayName: g.name, isGroup: true };
+      this.assetGroups.set(g.id, { id: g.id, name: g.name });
+      this.applyTransformToNode(node, g.transform);
+    }
+
     let restored = 0;
-    let skipped = 0;
-    for (const a of assets) {
-      if (!a.embedded || !a.data) { skipped += 1; continue; }
-      try {
-        const bytes = base64ToBytes(a.data);
-        const fileName = `${a.name}.${a.format}`;
-        const descriptor = await this.importAsset(new File([bytes], fileName, { type: 'model/gltf-binary' }));
-        // Re-key to the saved id, apply the saved transform, and re-select so the
-        // inspector tracks the restored id.
-        this.renameAssetId(descriptor.id, a.id);
-        this.setAssetTransform(a.id, a.transform);
-        this.selectObject(a.id);
-        restored += 1;
-      } catch {
-        skipped += 1;
+    let missing = 0;
+    for (const a of snapshot.assets ?? []) {
+      let bytes: Uint8Array | null = null;
+      if (a.embedded && a.data) bytes = base64ToBytes(a.data);
+      else if (this.externalResolver) bytes = await this.externalResolver(a.referencePath).catch(() => null);
+
+      if (bytes) {
+        try {
+          const descriptor = await this.importAsset(new File([bytes], `${a.name}.${a.format}`, { type: 'model/gltf-binary' }));
+          if (descriptor.id !== a.id) this.renameAssetId(descriptor.id, a.id);
+          const rec = this.importedAssets.get(a.id);
+          if (rec) {
+            rec.name = a.name; rec.referenceMode = a.referenceMode; rec.referencePath = a.referencePath;
+            rec.missing = false; rec.groupId = a.groupId; rec.transform = a.transform;
+          }
+          const node = this.findMeshById(a.id);
+          if (node?.metadata) node.metadata.displayName = a.name;
+          if (a.groupId) { const gNode = this.findMeshById(a.groupId); if (gNode && node) node.setParent(gNode); }
+          this.setAssetTransform(a.id, a.transform); // saved LOCAL transform (group-relative when grouped)
+          restored += 1;
+          continue;
+        } catch { /* fall through to missing stub */ }
       }
+      // Missing external asset — keep an honest stub so it stays listed/relinkable.
+      this.importedAssets.set(a.id, {
+        id: a.id, name: a.name, format: a.format, fileBytes: a.fileBytes, bytes: null,
+        referenceMode: true, referencePath: a.referencePath, missing: true,
+        transform: a.transform, meshCount: a.meshCount, vertexCount: a.vertexCount, groupId: a.groupId,
+      });
+      missing += 1;
     }
     this.emitSceneGraph();
     this.emitAssets();
-    return { restored, skipped };
+    return { restored, missing, groups: (snapshot.groups ?? []).length };
   }
 
   private renameAssetId(fromId: string, toId: string) {

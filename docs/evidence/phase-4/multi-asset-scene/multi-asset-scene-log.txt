@@ -1,0 +1,23 @@
+imported assets: 3 (cube 8v, pyramid 4v, octa 6v)
+selected chase-test-octa in the outliner (inspector shown)
+renamed chase-test-cube -> "Anchor Desk Prop"
+duplicated chase-test-pyramid -> total assets now 4
+created group "Set Group"; groups in outliner: 1
+group transform set: posX=-0.8 posY=1.2
+marked "Anchor Desk Prop" as external reference -> /ext-test-asset.glb
+
+saved scene: 4 assets, 1 group(s)
+embedded=true assets: chase-test-pyramid, chase-test-octa, chase-test-pyramid copy
+embedded=false (external) assets: Anchor Desk Prop@/ext-test-asset.glb
+group "Set Group" childIds: ["root-3","root-4"] transform.posY=1.2
+
+assets after reload before reopen: 0
+reopened: 4 assets, 1 group(s) restored (external file present)
+exact transform restore across reload: assets=true (4 compared), group=true
+outliner buttons after missing reopen: ["Set Group · 2","","chase-test-octa","","","","chase-test-pyramid copy","","","","Anchor Desk Prop","","","chase-test-pyramid","","",""]
+
+missing-file reopen: assets still listed in outliner: 4
+missing-asset warning shown for the unresolved external asset: true
+"Anchor Desk Prop" after missing reopen -> missing=true, transform preserved posX=-1.5
+
+-> PASS: multi-asset scene imported, renamed, duplicated, grouped + transformed, saved (embedded + external), reloaded with exact transforms, and missing external file shown honestly. No crash.

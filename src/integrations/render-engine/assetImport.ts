@@ -81,6 +81,15 @@ export function canEmbed(fileBytes: number): boolean {
   return fileBytes > 0 && fileBytes <= EMBED_LIMIT_BYTES;
 }
 
+/**
+ * Whether an asset is stored embedded in the project. Embedded only when the
+ * operator hasn't forced reference mode AND the file is within the embed limit;
+ * otherwise it is kept as an external reference.
+ */
+export function effectiveEmbedded(referenceMode: boolean, fileBytes: number): boolean {
+  return !referenceMode && canEmbed(fileBytes);
+}
+
 // Chunked base64 so large buffers don't blow the call stack.
 export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
