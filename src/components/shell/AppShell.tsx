@@ -7,11 +7,14 @@ import { Timeline } from './Timeline';
 import { Inspector, InspectorExpandHandle } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
+import { GraphicsSync } from './GraphicsSync';
 import { useShell } from '@/context/ShellContext';
+
+const FULL_SURFACE_MODULES = new Set(['switcher', 'settings', 'scenes', 'graphics']);
 
 export function AppShell() {
   const { state } = useShell();
-  const showRightColumn = state.activeModule !== 'switcher' && state.activeModule !== 'settings';
+  const showRightColumn = !FULL_SURFACE_MODULES.has(state.activeModule);
 
   return (
     <div
@@ -55,6 +58,7 @@ export function AppShell() {
       </div>
 
       <StatusBar />
+      <GraphicsSync />
     </div>
   );
 }

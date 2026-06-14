@@ -49,6 +49,9 @@ import {
   AssetImportError, type ImportedAsset, type AssetGroup, type SerializedAsset,
   type SerializedGroup, type SceneSnapshot, type AssetTransform, type ExternalResolver,
 } from '@/integrations/render-engine/types';
+import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
+import type { GraphicItem } from '@/graphics/graphicsTypes';
+import type { NodeTransform } from '@/scenes/sceneTypes';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -182,6 +185,7 @@ export class StudioEngine {
   private engine: Engine | null = null;
   private scene: Scene | null = null;
   private gizmoManager: GizmoManager | null = null;
+  private graphics: BroadcastGraphics | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private listeners = new Set<StudioEngineListener>();
   private refs: DeskSceneRefs | null = null;
@@ -256,6 +260,10 @@ export class StudioEngine {
     this.gizmoManager.rotationGizmoEnabled = false;
     this.gizmoManager.scaleGizmoEnabled = false;
     this.attachGizmoObservers();
+
+    // Real broadcast graphics overlay rendered ON the live scene (so on-air
+    // graphics are part of the rendered frame, captured by output/thumbnails).
+    this.graphics = new BroadcastGraphics(this.scene);
 
     // Freeze materials that never change so Babylon skips their per-frame
     // readiness/dirty checks. The dynamic ones (desk, floor, desk-screen, and
@@ -1457,6 +1465,57 @@ export class StudioEngine {
     this.emitSceneGraph();
   }
 
+  // ---- Broadcast graphics (CG play/stop/update against the live overlay) ----
+  playGraphic(item: GraphicItem) { this.graphics?.play(item); this.lastInteractionAt = (typeof performance !== 'undefined' ? performance.now() : Date.now()); }
+  stopGraphic(id: string) { this.graphics?.stop(id); }
+  updateGraphic(item: GraphicItem) { this.graphics?.update(item); }
+  isGraphicOn(id: string): boolean { return this.graphics?.isOn(id) ?? false; }
+  clearGraphics() { this.graphics?.clear(); }
+
+  // ---- Scene composer (capture/restore node transforms + camera) ----
+  /** The id of the currently active 3D camera. */
+  getActiveCameraId(): CameraId {
+    return this.activeCameraId;
+  }
+
+  /** Capture local transforms of every selectable scene node (for saved scenes). */
+  captureNodeTransforms(): NodeTransform[] {
+    if (!this.scene) return [];
+    const out: NodeTransform[] = [];
+    for (const node of this.getSceneNodes()) {
+      const target = this.findMeshById(node.id);
+      if (!target) continue;
+      out.push({
+        id: node.id,
+        position: [target.position.x, target.position.y, target.position.z],
+        rotation: [target.rotation.x, target.rotation.y, target.rotation.z],
+        scaling: [target.scaling.x, target.scaling.y, target.scaling.z],
+      });
+    }
+    return out;
+  }
+
+  /** Restore node transforms; skips nodes no longer present (honest partial restore). */
+  applyNodeTransforms(nodes: NodeTransform[]): { restored: number; missing: number } {
+    let restored = 0;
+    let missing = 0;
+    for (const n of nodes) {
+      const target = this.findMeshById(n.id);
+      if (!target) { missing += 1; continue; }
+      target.position.set(n.position[0], n.position[1], n.position[2]);
+      target.rotation.set(n.rotation[0], n.rotation[1], n.rotation[2]);
+      target.scaling.set(n.scaling[0], n.scaling[1], n.scaling[2]);
+      restored += 1;
+    }
+    this.emitSceneGraph();
+    return { restored, missing };
+  }
+
+  /** PNG data URL of the active camera's view for a scene thumbnail. */
+  async captureSceneThumbnail(width = 320): Promise<string> {
+    return (await this.captureCameraThumbnail(this.activeCameraId, width)) ?? '';
+  }
+
   getSceneNodes(): SceneNodeInfo[] {
     if (!this.scene) return [];
     const nodes = new Map<string, SceneNodeInfo>();
@@ -1593,6 +1652,8 @@ export class StudioEngine {
     }
     this.trackingActive = false;
     this.resizeObserver?.disconnect();
+    this.graphics?.dispose();
+    this.graphics = null;
     this.gizmoManager?.dispose();
     this.scene?.dispose();
     this.engine?.dispose();

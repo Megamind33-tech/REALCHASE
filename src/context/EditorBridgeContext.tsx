@@ -10,6 +10,8 @@ import {
 import { StudioEngine, type TrackingStatus } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
+import type { GraphicItem } from '@/graphics/graphicsTypes';
+import type { NodeTransform } from '@/scenes/sceneTypes';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -42,6 +44,14 @@ interface EditorBridgeValue {
   renameGroup: (id: string, name: string) => void;
   serializeScene: () => SceneSnapshot;
   restoreScene: (snapshot: SceneSnapshot) => Promise<{ restored: number; missing: number; groups: number }>;
+  playGraphic: (item: GraphicItem) => void;
+  stopGraphic: (id: string) => void;
+  updateGraphic: (item: GraphicItem) => void;
+  clearGraphics: () => void;
+  captureNodeTransforms: () => NodeTransform[];
+  applyNodeTransforms: (nodes: NodeTransform[]) => { restored: number; missing: number };
+  captureSceneThumbnail: (width?: number) => Promise<string>;
+  getActiveCameraId: () => string;
   assets: ImportedAsset[];
   groups: AssetGroup[];
   sceneNodes: SceneNodeInfo[];
@@ -261,6 +271,19 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     return engine.restoreScene(snapshot);
   }, []);
 
+  const playGraphic = useCallback((item: GraphicItem) => { engineRef.current?.playGraphic(item); }, []);
+  const stopGraphic = useCallback((id: string) => { engineRef.current?.stopGraphic(id); }, []);
+  const updateGraphic = useCallback((item: GraphicItem) => { engineRef.current?.updateGraphic(item); }, []);
+  const clearGraphics = useCallback(() => { engineRef.current?.clearGraphics(); }, []);
+
+  const captureNodeTransforms = useCallback(() => engineRef.current?.captureNodeTransforms() ?? [], []);
+  const applyNodeTransforms = useCallback(
+    (nodes: NodeTransform[]) => engineRef.current?.applyNodeTransforms(nodes) ?? { restored: 0, missing: 0 },
+    [],
+  );
+  const captureSceneThumbnail = useCallback((width?: number) => engineRef.current?.captureSceneThumbnail(width) ?? Promise.resolve(''), []);
+  const getActiveCameraId = useCallback(() => engineRef.current?.getActiveCameraId() ?? 'cam1', []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -293,6 +316,14 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         renameGroup,
         serializeScene,
         restoreScene,
+        playGraphic,
+        stopGraphic,
+        updateGraphic,
+        clearGraphics,
+        captureNodeTransforms,
+        applyNodeTransforms,
+        captureSceneThumbnail,
+        getActiveCameraId,
         assets,
         groups,
         sceneNodes,

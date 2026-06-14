@@ -8,6 +8,8 @@ import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { ViewportCanvas } from '@/components/viewport/ViewportCanvas';
 import { SwitcherPanel } from '@/components/shell/SwitcherPanel';
+import { ScenesPanel } from '@/components/shell/ScenesPanel';
+import { GraphicsPanel } from '@/components/shell/GraphicsPanel';
 import type { QualityMode, TransformMode } from '@/context/shellTypes';
 
 const QUALITY_MODES: QualityMode[] = ['low', 'balanced', 'high'];
@@ -27,6 +29,14 @@ export function Viewport() {
 
   if (state.activeModule === 'switcher') {
     return <SwitcherPanel />;
+  }
+
+  if (state.activeModule === 'scenes') {
+    return <ScenesPanel />;
+  }
+
+  if (state.activeModule === 'graphics') {
+    return <GraphicsPanel />;
   }
 
   if (state.activeModule !== 'builder') {
