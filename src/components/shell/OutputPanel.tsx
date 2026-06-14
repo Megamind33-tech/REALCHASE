@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { AudioMeter } from '@/components/audio/AudioMeter';
@@ -6,7 +5,7 @@ import { TRANSITIONS, STREAM_DESTINATIONS } from '@/data/mock/studioData';
 
 export function OutputPanel() {
   const { state } = useShell();
-  const { sources } = useSources();
+  const { sources, onAir, liveLabel, capturing, recordLabel } = useSources();
   const liveAudioSources = sources.filter((s) => s.status === 'live' && s.stream && s.stream.getAudioTracks().length > 0);
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
@@ -67,47 +66,53 @@ export function OutputPanel() {
           )}
         </div>
 
-        <div className="section-label" style={{ marginBottom: 6 }}>Output &amp; Stream</div>
+        {/* These two tiles mirror the real toolbar controls: capture (MediaRecorder
+            → .webm) and output (WebRTC/WHIP publish). State is derived from the
+            shared sources context, so the panel reflects ground truth — it never
+            shows an active state unless capture/output is genuinely running. */}
+        <div className="section-label" style={{ marginBottom: 6 }}>Output &amp; Capture</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <div
+            data-testid="output-capture-tile"
             style={{
               flex: 1,
               padding: 8,
               background: 'var(--bg-panel-raised)',
-              border: '1px solid var(--border-subtle)',
+              border: `1px solid ${capturing ? 'var(--status-rec)' : 'var(--border-subtle)'}`,
               borderRadius: 3,
               fontSize: 10,
             }}
           >
-            <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>REC</div>
-            <div className="mono" style={{ color: 'var(--text-muted)' }}>Requires recording engine</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Recorder not connected (Phase 2)</div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Capture</div>
+            <div className="mono" style={{ color: capturing ? 'var(--status-rec)' : 'var(--text-muted)' }}>{recordLabel}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+              {capturing ? 'Writing the Program output to a .webm file.' : 'Idle — start capture from the toolbar.'}
+            </div>
           </div>
           <div
+            data-testid="output-air-tile"
             style={{
               flex: 1,
               padding: 8,
               background: 'var(--bg-panel-raised)',
-              border: '1px solid var(--border-subtle)',
+              border: `1px solid ${onAir ? 'var(--status-rec)' : 'var(--border-subtle)'}`,
               borderRadius: 3,
               fontSize: 10,
             }}
           >
-            <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Program Monitor</div>
-            <div style={{ color: 'var(--text-muted)' }}>Requires streaming engine</div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>Output not connected (Phase 2)</div>
-            <Button
-              variant="secondary"
-              style={{ marginTop: 4, height: 20, fontSize: 9, width: '100%' }}
-              disabled title="Disabled until real output pipeline"
-            >
-              Manage Destinations
-            </Button>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Program Output</div>
+            <div className="mono" style={{ color: onAir ? 'var(--status-rec)' : 'var(--text-muted)' }}>{onAir ? liveLabel : 'Off air'}</div>
+            <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+              {onAir ? 'Publishing the Program output over WebRTC/WHIP.' : 'Idle — go on air from the toolbar.'}
+            </div>
           </div>
         </div>
 
         <div data-testid="stream-destination-panel">
           <div className="section-label" style={{ marginBottom: 4 }}>Stream Destinations</div>
+          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 4 }}>
+            Output publishes to the WHIP endpoint set in the toolbar. Per-destination publishing not wired.
+          </div>
           {STREAM_DESTINATIONS.map((dest) => (
           <div
             key={dest.id}
@@ -121,7 +126,7 @@ export function OutputPanel() {
             }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>{dest.name}</span>
-            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Streaming disabled until MediaMTX/output pipeline is added</span>
+            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Per-destination publishing not wired</span>
           </div>
           ))}
         </div>

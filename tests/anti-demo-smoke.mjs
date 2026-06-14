@@ -111,8 +111,11 @@ if (/<AudioMeter\b/.test(outputPanel)) {
 if (!outputPanel.includes('No real audio source connected')) {
   fail('outputs surface does not expose the honest no-audio-source fallback state');
 }
-if (!outputPanel.includes('Streaming disabled until MediaMTX/output pipeline is added')) {
-  fail('stream destination panel does not explain disabled streaming state');
+// Output now publishes for real over WHIP from the toolbar. The destinations
+// list must still be honest that the named per-platform destinations are not
+// individually wired (publishing goes to the single WHIP endpoint).
+if (!outputPanel.includes('Per-destination publishing not wired')) {
+  fail('stream destination panel does not honestly mark per-destination publishing as unwired');
 }
 
 const viewport = read('src/components/shell/Viewport.tsx');
