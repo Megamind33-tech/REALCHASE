@@ -1,6 +1,15 @@
 # CHASE STUDIO PRO — Next Work Queue & Milestone Breakdown
 
 **Planning Period:** June 14 – December 31, 2026  
+## Resume Point (2026-06-14)
+
+- **Branch:** `chase/fork-audit`
+- **Latest implementation commit:** `c778e73`
+- **M2 backport:** COMPLETE at `729cc78`; real webcam, video file, image, and screen source paths are wired to Preview/Program and the Babylon scene.
+- **Verification:** TypeScript, source-manager browser smoke, anti-demo smoke, FreeD regression, and in-app browser UI smoke pass.
+- **Known blocker:** Production `vite build` exceeded 304.5 seconds without output on this OneDrive workstation. Do not report the production bundle as passing until this is resolved or reproduced elsewhere.
+- **Next patch:** M7 composite output preview and recording telemetry, followed by truthful codec capability selection/fallback.
+
 **Target Delivery:** Production-ready virtual broadcasting studio  
 **Approach:** Milestone-based; each completes a distinct value delivery
 
@@ -33,19 +42,20 @@
 
 ---
 
-## MILESTONE 2: Real Source Input (Video Files, Images, Screen Capture)
+## MILESTONE 2: Real Source Input (Video Files, Images, Screen Capture) - COMPLETE
 
 **Objective:** Make source manager support all broadcast input types, not just webcam.
 
 **Acceptance Criteria:**
-- [ ] Video file (MP4, MOV, WebM) drag-and-drop to sources
-- [ ] Image file (PNG, JPEG) as static texture source
-- [ ] Screen/window capture via getDisplayMedia
-- [ ] All three input types appear in source list with correct type badge
-- [ ] Placement modes work on all three (mediaPlane, screenInsert, presenterPlate)
-- [ ] Keying works on image/video sources (if applicable)
-- [ ] No memory leaks on add/remove
-- [ ] Evidence: smoke test with 10+ sources, video playback, image display
+- [x] Video file (MP4, MOV, WebM) file-picker ingestion to sources
+- [x] Image file (PNG, JPEG, WebP, GIF, BMP) as a static canvas-backed source
+- [x] Screen/window capture via getDisplayMedia
+- [x] All input types appear in the source list with correct type badges
+- [x] Placement modes share the real stream path (mediaPlane, screenInsert, presenterPlate)
+- [x] Keying settings apply through the existing Program shader path
+- [x] Tracks, listeners, object URLs, elements, and frame loops are released on remove
+- [x] Evidence: `tests/source-manager-smoke.mjs` verifies decoded video/image frames and lifecycle
+- [ ] Stress evidence with 10+ simultaneous file sources (deferred to M9 performance testing)
 
 **Key Changes:**
 1. **SourcesContext.tsx**

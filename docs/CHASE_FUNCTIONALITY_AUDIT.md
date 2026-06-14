@@ -1,5 +1,24 @@
 # CHASE STUDIO PRO — Comprehensive Functionality Audit
 
+## Verified M2 Source Manager Backport (2026-06-14)
+
+**Branch:** `chase/fork-audit`  
+**Implementation commits:** `729cc78`, `c778e73`
+
+- [x] Add a real webcam source, or show an honest unavailable/permission error.
+- [x] Add a real local video file source and decode frames into a live `MediaStream`.
+- [x] Add a real local image source through a bounded-resolution canvas stream.
+- [x] Add screen/window capture with `getDisplayMedia`, with an honest unsupported state.
+- [x] Show real source type and track-health state in the source list.
+- [x] Route selected sources through Preview and CUT to Program.
+- [x] Reuse mediaPlane, screenInsert, presenterPlate, and keying settings for all real streams.
+- [x] Rename and remove sources.
+- [x] Release tracks, listeners, object URLs, hidden elements, and frame loops on remove/unmount.
+- [x] Persist source metadata without serializing fake streams or local file contents.
+- [x] Browser smoke verifies decoded image/video frames, Preview/Program state, rename/remove, and cleanup.
+
+**Residual risk:** A headed operator rehearsal is still required for the native screen-selection prompt and real camera permissions. The production Vite bundle timed out on the current OneDrive workstation; TypeScript and dev-runtime tests pass.
+
 **Scope:** All user-facing features and internal systems  
 **Format:** Feature → Status → Working Details → Missing/Broken Details → Acceptance Criteria for "done"
 
