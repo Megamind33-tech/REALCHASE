@@ -44,6 +44,10 @@ export interface KeyingSettings {
   garbageTop: number;
   garbageRight: number;
   garbageBottom: number;
+  /** Lighting/colour match: blend the source toward set exposure+tint (0 = off). */
+  matchAmount: number;
+  matchColor: string;
+  matchExposure: number;
   opacity: number;
   /** When true the shader renders the alpha matte (grayscale) for calibration. */
   showMatte: boolean;
@@ -63,6 +67,9 @@ export const DEFAULT_KEYING_SETTINGS: KeyingSettings = {
   garbageTop: 0,
   garbageRight: 1,
   garbageBottom: 1,
+  matchAmount: 0,
+  matchColor: '#ffffff',
+  matchExposure: 1,
   opacity: 1,
   showMatte: false,
 };

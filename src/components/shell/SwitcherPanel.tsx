@@ -149,6 +149,15 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
           <KeySlider label="Crop right" value={keying.garbageRight} min={0.5} max={1} step={0.01} onChange={(v) => set({ garbageRight: v })} />
           <KeySlider label="Crop top" value={keying.garbageTop} min={0} max={0.5} step={0.01} onChange={(v) => set({ garbageTop: v })} />
           <KeySlider label="Crop bottom" value={keying.garbageBottom} min={0.5} max={1} step={0.01} onChange={(v) => set({ garbageBottom: v })} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>Lighting / colour match</span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text-secondary)' }}>
+              Set light
+              <input type="color" value={keying.matchColor} onChange={(e) => set({ matchColor: e.target.value })} style={{ width: 28, height: 18, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="Set light colour" />
+            </label>
+          </div>
+          <KeySlider label="Match amount" value={keying.matchAmount} min={0} max={1} step={0.01} onChange={(v) => set({ matchAmount: v })} />
+          <KeySlider label="Exposure" value={keying.matchExposure} min={0.3} max={2} step={0.01} onChange={(v) => set({ matchExposure: v })} />
         </>
       )}
       <KeySlider label="Opacity" value={keying.opacity} min={0} max={1} step={0.01} onChange={(v) => set({ opacity: v })} />
