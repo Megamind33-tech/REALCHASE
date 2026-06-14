@@ -9,7 +9,7 @@ import { buildProjectFile, parseProjectFile, saveProjectFile } from '@/projectPe
 
 export function TopBar() {
   const { state, dispatch } = useShell();
-  const { sources, previewId, programId, restoreProjectSources } = useSources();
+  const { sources, previewId, programId, restoreProjectSources, capturing, canRecord, recordLabel, toggleCapture } = useSources();
   const openRef = useRef<HTMLInputElement>(null);
   const { metrics } = state;
 
@@ -102,10 +102,18 @@ export function TopBar() {
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* Disabled until a real recorder/output pipeline exists. */}
-        <Button data-testid="record-status" variant="secondary" disabled title="Recorder not wired yet">
-          <Circle size={10} fill="var(--status-rec)" />
-          REC · Requires recording engine
+        {/* Real capture: MediaRecorder writes the Program output to a .webm
+            file. Enabled only when a Program source is on air. */}
+        <Button
+          data-testid="record-status"
+          variant={capturing ? 'danger' : 'secondary'}
+          disabled={!canRecord && !capturing}
+          onClick={() => toggleCapture()}
+          aria-pressed={capturing}
+          title={canRecord || capturing ? 'Capture the Program output to a .webm file' : 'Put a source on Program to capture'}
+        >
+          <Circle size={10} fill="var(--status-rec)" className={capturing ? 'rec-pulse' : ''} />
+          {recordLabel}
         </Button>
         <Button data-testid="live-status" variant="secondary" disabled title="Live output not wired yet">
           GO LIVE · Requires streaming engine

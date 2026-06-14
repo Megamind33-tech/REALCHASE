@@ -1,0 +1,13 @@
+REC button disabled before a Program source? (null = enabled): null
+button label while recording: ● REC 0:03
+downloaded file: chase-program-2026-06-14T02-58-41-952Z.webm
+file size: 113582 bytes
+valid WebM (EBML magic 1A45DFA3): true  [first bytes: 1a 45 df a3]
+-> a real MediaRecorder .webm of the Program output was produced and saved.
+
+--- page console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:58:28]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:58:34]: Babylon.js v9.9.1 - WebGL2

@@ -22,6 +22,7 @@ interface EditorBridgeValue {
   trackingStatus: TrackingStatus | 'idle';
   trackingLinked: boolean;
   trackingLabel: string;
+  captureOutputStream: (fps?: number) => MediaStream | null;
   sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
@@ -143,6 +144,8 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engineRef.current?.disconnectTrackingSource();
   }, []);
 
+  const captureOutputStream = useCallback((fps?: number) => engineRef.current?.captureOutputStream(fps) ?? null, []);
+
   const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
 
   const addObject = useCallback((objectId: string) => {
@@ -174,6 +177,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         trackingStatus,
         trackingLinked: trackingStatus === 'connected' || trackingStatus === 'connecting',
         trackingLabel: TRACKING_LABELS[trackingStatus],
+        captureOutputStream,
         sampleKeyColor,
         addObject,
         loadPack,
