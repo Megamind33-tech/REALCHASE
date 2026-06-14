@@ -1,0 +1,12 @@
+FreeD BINARY packets sent over WebSocket (ws://localhost:7788); client connected: true; binary frames sent: 180
+pose A FreeD bytes: d1 01 10 00 b0 f4 41 51 00 00 00 fb 1e 00 05 5f 00 fa 24 00 60 00 00 00 00 00 00 00 2d
+pose A decoded position(m): [-5, 5.5, -6] zoom 0x600000
+pose B decoded position(m): [5, 1.1, -4.5] zoom 0xb00000
+-> 01 vs 02 show the camera at the two FreeD-commanded poses (real binary FreeD drives the virtual camera).
+
+--- page console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:46:43]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:46:49]: Babylon.js v9.9.1 - WebGL2
