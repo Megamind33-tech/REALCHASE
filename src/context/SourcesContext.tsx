@@ -19,12 +19,14 @@ import {
 } from '@/output/destinations';
 import {
   DEFAULT_KEYING_SETTINGS,
+  describeDisplayMediaError,
   describeMediaError,
   type KeyingSettings,
   type PlacementMode,
   type Source,
   type SourceRole,
 } from '@/sources/sourceTypes';
+import { acquireImageFile, acquireVideoFile, type AcquiredSourceMedia } from '@/sources/mediaSources';
 
 interface SourcesState {
   sources: Source[];
@@ -76,6 +78,10 @@ interface SourcesValue {
   previewSource: Source | null;
   programSource: Source | null;
   addWebcamSource: () => Promise<void>;
+  addVideoFileSource: (file: File) => Promise<void>;
+  addImageFileSource: (file: File) => Promise<void>;
+  addScreenSource: () => Promise<void>;
+  renameSource: (id: string, name: string) => void;
   removeSource: (id: string) => void;
   setPreview: (id: string | null) => void;
   cut: () => void;
@@ -133,6 +139,42 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   // Always-current mirror so the unmount cleanup can stop every live track.
   const sourcesRef = useRef(state.sources);
   sourcesRef.current = state.sources;
+  const sourceMediaRef = useRef(new Map<string, AcquiredSourceMedia>());
+  const cancelledSourceIdsRef = useRef(new Set<string>());
+
+  const releaseSource = useCallback((id: string, fallbackStream: MediaStream | null = null) => {
+    const media = sourceMediaRef.current.get(id);
+    if (media) {
+      media.dispose();
+      sourceMediaRef.current.delete(id);
+    } else {
+      stopStream(fallbackStream);
+    }
+  }, []);
+
+  const attachSourceMedia = useCallback((id: string, media: AcquiredSourceMedia, endedMessage: string) => {
+    if (cancelledSourceIdsRef.current.delete(id)) {
+      media.dispose();
+      return;
+    }
+    const videoTrack = media.stream.getVideoTracks()[0];
+    const onEnded = () => {
+      dispatch({ type: 'PATCH', id, patch: { status: 'idle', stream: null, error: endedMessage } });
+    };
+    if (videoTrack) {
+      videoTrack.addEventListener('ended', onEnded, { once: true });
+    }
+    const managedMedia: AcquiredSourceMedia = {
+      stream: media.stream,
+      dispose: () => {
+        videoTrack?.removeEventListener('ended', onEnded);
+        media.dispose();
+      },
+    };
+    sourceMediaRef.current.set(id, managedMedia);
+    dispatch({ type: 'PATCH', id, patch: { status: 'live', stream: managedMedia.stream, error: null, needsReconnect: false } });
+    if (!state.previewId) dispatch({ type: 'SET_PREVIEW', id });
+  }, [state.previewId]);
 
   const programSource = state.sources.find((s) => s.id === state.programId) ?? null;
   const previewSource = state.sources.find((s) => s.id === state.previewId) ?? null;
@@ -148,9 +190,9 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   // Stop all camera tracks when the app unmounts — no background cameras left on.
   useEffect(() => {
     return () => {
-      sourcesRef.current.forEach((s) => stopStream(s.stream));
+      sourcesRef.current.forEach((s) => releaseSource(s.id, s.stream));
     };
-  }, []);
+  }, [releaseSource]);
 
   const addWebcamSource = useCallback(async () => {
     const id = newId();
@@ -187,19 +229,83 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
         // Device may have no microphone — fall back to video-only rather than fail.
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
-      dispatch({ type: 'PATCH', id, patch: { status: 'live', stream, error: null } });
-      // Convenience: route the first live source to Preview if Preview is empty.
-      dispatch({ type: 'SET_PREVIEW', id });
+      attachSourceMedia(id, { stream, dispose: () => stopStream(stream) }, 'Camera disconnected.');
     } catch (err) {
       dispatch({ type: 'PATCH', id, patch: { status: 'error', error: describeMediaError(err) } });
     }
+  }, [attachSourceMedia]);
+
+  const addFileSource = useCallback(async (file: File, type: 'video' | 'image') => {
+    const id = newId();
+    const source: Source = {
+      id,
+      name: file.name.replace(/\.[^.]+$/, '') || (type === 'video' ? 'Video Source' : 'Image Source'),
+      type,
+      status: 'connecting',
+      createdAt: Date.now(),
+      stream: null,
+      error: null,
+      placement: 'mediaPlane',
+      screenTargetId: 'led-main',
+      keying: DEFAULT_KEYING_SETTINGS,
+    };
+    dispatch({ type: 'ADD', source });
+    try {
+      const media = type === 'video' ? await acquireVideoFile(file) : await acquireImageFile(file);
+      attachSourceMedia(id, media, `${type === 'video' ? 'Video' : 'Image'} source stopped.`);
+    } catch (err) {
+      dispatch({ type: 'PATCH', id, patch: { status: 'error', error: err instanceof Error ? err.message : `Unable to load ${type} source.` } });
+    }
+  }, [attachSourceMedia]);
+
+  const addVideoFileSource = useCallback((file: File) => addFileSource(file, 'video'), [addFileSource]);
+  const addImageFileSource = useCallback((file: File) => addFileSource(file, 'image'), [addFileSource]);
+
+  const addScreenSource = useCallback(async () => {
+    const id = newId();
+    const index = sourcesRef.current.filter((s) => s.type === 'screen').length + 1;
+    const source: Source = {
+      id,
+      name: `Screen ${index}`,
+      type: 'screen',
+      status: 'connecting',
+      createdAt: Date.now(),
+      stream: null,
+      error: null,
+      placement: 'mediaPlane',
+      screenTargetId: 'led-main',
+      keying: DEFAULT_KEYING_SETTINGS,
+    };
+    dispatch({ type: 'ADD', source });
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      dispatch({ type: 'PATCH', id, patch: { status: 'error', error: 'Screen capture is not available in this environment.' } });
+      return;
+    }
+    try {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'NotAllowedError') throw error;
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      }
+      attachSourceMedia(id, { stream, dispose: () => stopStream(stream) }, 'Screen capture ended.');
+    } catch (err) {
+      dispatch({ type: 'PATCH', id, patch: { status: 'error', error: describeDisplayMediaError(err) } });
+    }
+  }, [attachSourceMedia]);
+
+  const renameSource = useCallback((id: string, name: string) => {
+    const next = name.trim();
+    if (next) dispatch({ type: 'PATCH', id, patch: { name: next } });
   }, []);
 
   const removeSource = useCallback((id: string) => {
     const target = sourcesRef.current.find((s) => s.id === id);
-    stopStream(target?.stream ?? null);
+    if (target?.status === 'connecting' && !sourceMediaRef.current.has(id)) cancelledSourceIdsRef.current.add(id);
+    releaseSource(id, target?.stream ?? null);
     dispatch({ type: 'REMOVE', id });
-  }, []);
+  }, [releaseSource]);
 
   const setPreview = useCallback((id: string | null) => {
     dispatch({ type: 'SET_PREVIEW', id });
@@ -219,9 +325,12 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const restoreProjectSources = useCallback((sources: Source[], previewId: string | null, programId: string | null) => {
-    sourcesRef.current.forEach((s) => stopStream(s.stream));
+    sourcesRef.current.forEach((s) => {
+      if (s.status === 'connecting' && !sourceMediaRef.current.has(s.id)) cancelledSourceIdsRef.current.add(s.id);
+      releaseSource(s.id, s.stream);
+    });
     dispatch({ type: 'RESTORE', sources, previewId, programId });
-  }, []);
+  }, [releaseSource]);
 
   const roleOf = useCallback(
     (id: string): SourceRole => {
@@ -398,6 +507,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     previewSource,
     programSource,
     addWebcamSource,
+    addVideoFileSource,
+    addImageFileSource,
+    addScreenSource,
+    renameSource,
     removeSource,
     setPreview,
     cut,

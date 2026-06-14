@@ -3,11 +3,9 @@
  *
  * Designed to grow into the inputs the broadcast pipeline will need later
  * (screen capture, media files, images, NDI, MediaMTX streams) without
- * reshaping this contract. Phase 2 implements the `webcam` type only; the other
- * `SourceType` values are declared so the UI/state can branch on them, but
- * creating them is intentionally not wired yet.
+ * reshaping this contract.
  */
-export type SourceType = 'webcam' | 'screen' | 'media' | 'image' | 'ndi' | 'mediamtx';
+export type SourceType = 'webcam' | 'screen' | 'video' | 'image' | 'media' | 'ndi' | 'mediamtx';
 
 export type SourceStatus = 'idle' | 'connecting' | 'live' | 'error';
 
@@ -100,8 +98,8 @@ export interface Source {
 /** Which switcher bus a source is currently assigned to (derived, not stored per-source). */
 export type SourceRole = 'preview' | 'program' | 'both' | null;
 
-/** The set of source types that Phase 2 can actually create. */
-export const IMPLEMENTED_SOURCE_TYPES: readonly SourceType[] = ['webcam'];
+/** The source types that can be created by the current Source Manager. */
+export const IMPLEMENTED_SOURCE_TYPES: readonly SourceType[] = ['webcam', 'video', 'image', 'screen'];
 
 /** Maps a raw getUserMedia failure to a clear, user-facing message. */
 export function describeMediaError(err: unknown): string {
@@ -120,4 +118,16 @@ export function describeMediaError(err: unknown): string {
     }
   }
   return err instanceof Error ? err.message : 'Unknown camera error.';
+}
+
+/** Maps a raw getDisplayMedia failure to a clear, user-facing message. */
+export function describeDisplayMediaError(err: unknown): string {
+  if (typeof DOMException !== 'undefined' && err instanceof DOMException) {
+    if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+      return 'Screen capture was cancelled or denied.';
+    }
+    if (err.name === 'NotFoundError') return 'No screen or window is available to capture.';
+    return err.message || `Screen capture error: ${err.name}`;
+  }
+  return err instanceof Error ? err.message : 'Unknown screen capture error.';
 }

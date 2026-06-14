@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Video, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { ArrowRight, Camera, FileVideo, Image as ImageIcon, MonitorUp, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSources } from '@/context/SourcesContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
@@ -73,7 +73,7 @@ function StatusBadge({ source }: { source: Source }) {
 
 function Monitor({ title, stream, accent, tally }: { title: string; stream: MediaStream | null; accent: string; tally: string }) {
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div data-testid={`${title.toLowerCase()}-monitor`} style={{ flex: 1, minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <span className="section-label">{title}</span>
         <span className="mono" style={{ fontSize: 9, color: accent, fontWeight: 600 }}>{tally}</span>
@@ -166,17 +166,61 @@ function KeyingControls({ keying, onChange }: { keying: KeyingSettings; onChange
 }
 
 export function SwitcherPanel() {
-  const { sources, addWebcamSource, removeSource, setPreview, cut, previewSource, programSource, roleOf, previewId, updateSourcePlacement, updateSourceKeying } =
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const { sources, addWebcamSource, addVideoFileSource, addImageFileSource, addScreenSource, renameSource, removeSource, setPreview, cut, previewSource, programSource, roleOf, previewId, updateSourcePlacement, updateSourceKeying } =
     useSources();
+
+  const sourceIcon = (source: Source) => {
+    if (source.type === 'webcam') return <Camera size={16} color="var(--text-secondary)" />;
+    if (source.type === 'image') return <ImageIcon size={16} color="var(--text-secondary)" />;
+    if (source.type === 'screen') return <MonitorUp size={16} color="var(--text-secondary)" />;
+    return <FileVideo size={16} color="var(--text-secondary)" />;
+  };
 
   return (
     <div data-testid="switcher-surface" className="scroll-y" style={{ flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 16 }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Sources &amp; Switcher</h2>
-          <Button variant="secondary" onClick={() => void addWebcamSource()}>
-            <Plus size={14} /> Add Webcam
-          </Button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Button variant="secondary" onClick={() => void addWebcamSource()} data-testid="add-webcam-source">
+              <Camera size={14} /> Webcam
+            </Button>
+            <Button variant="secondary" onClick={() => videoInputRef.current?.click()} data-testid="add-video-source">
+              <FileVideo size={14} /> Video File
+            </Button>
+            <Button variant="secondary" onClick={() => imageInputRef.current?.click()} data-testid="add-image-source">
+              <ImageIcon size={14} /> Image
+            </Button>
+            <Button variant="secondary" onClick={() => void addScreenSource()} data-testid="add-screen-source">
+              <MonitorUp size={14} /> Screen
+            </Button>
+            <input
+              ref={videoInputRef}
+              data-testid="video-source-input"
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,video/ogg,.m4v"
+              hidden
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void addVideoFileSource(file);
+                event.currentTarget.value = '';
+              }}
+            />
+            <input
+              ref={imageInputRef}
+              data-testid="image-source-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+              hidden
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void addImageFileSource(file);
+                event.currentTarget.value = '';
+              }}
+            />
+          </div>
         </div>
 
         {/* Preview / Program monitors */}
@@ -208,7 +252,7 @@ export function SwitcherPanel() {
               fontSize: 11,
             }}
           >
-            No sources yet. Click <strong>Add Webcam</strong> to ingest your first live input.
+            No sources yet. Add a webcam, video file, image, or screen capture to begin.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -216,7 +260,7 @@ export function SwitcherPanel() {
               const role = roleOf(source.id);
               const keying = source.keying ?? DEFAULT_KEYING_SETTINGS;
               return (
-                <div key={source.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div key={source.id} data-testid="source-row" data-source-type={source.type} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <div
                   style={{
                     display: 'flex',
@@ -229,10 +273,20 @@ export function SwitcherPanel() {
                     borderRadius: 4,
                   }}
                 >
-                  <Video size={16} color="var(--text-secondary)" />
+                  {sourceIcon(source)}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 500 }}>{source.name}</span>
+                      <input
+                        defaultValue={source.name}
+                        aria-label={`Rename ${source.name}`}
+                        title="Edit source name"
+                        onBlur={(event) => {
+                          if (event.currentTarget.value.trim()) renameSource(source.id, event.currentTarget.value);
+                          else event.currentTarget.value = source.name;
+                        }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+                        style={{ width: 150, minWidth: 80, height: 22, fontSize: 12, fontWeight: 500 }}
+                      />
                       <span className="mono" style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{source.type}</span>
                       <StatusBadge source={source} />
                       {role && (

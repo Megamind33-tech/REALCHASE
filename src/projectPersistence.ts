@@ -57,14 +57,17 @@ export function parseProjectFile(text: string): { sources: Source[]; previewId: 
   const assetScene: SceneSnapshot = file.assetScene && Array.isArray(file.assetScene.assets)
     ? { assets: file.assetScene.assets, groups: Array.isArray(file.assetScene.groups) ? file.assetScene.groups : [] }
     : { assets: Array.isArray(file.assets) ? (file.assets as SceneSnapshot['assets']) : [], groups: [] };
+  const validSourceTypes = new Set<Source['type']>(['webcam', 'screen', 'video', 'image', 'media', 'ndi', 'mediamtx']);
   const sources = file.sources.map((raw) => ({
     id: String(raw.id),
     name: String(raw.name ?? 'Restored Source'),
-    type: raw.type === 'webcam' ? 'webcam' : 'media',
+    type: validSourceTypes.has(raw.type as Source['type']) ? raw.type as Source['type'] : 'media',
     status: 'idle',
     createdAt: Number(raw.createdAt ?? Date.now()),
     stream: null,
-    error: 'Source restored from project; reconnect live media.',
+    error: raw.type === 'image' || raw.type === 'video' || raw.type === 'media'
+      ? 'Source restored from project; choose the local file again.'
+      : 'Source restored from project; reconnect live media.',
     placement: raw.placement === 'screenInsert' || raw.placement === 'presenterPlate' || raw.placement === 'backgroundPlate' ? raw.placement : 'mediaPlane',
     screenTargetId: typeof raw.screenTargetId === 'string' ? raw.screenTargetId : 'led-main',
     keying: typeof raw.keying === 'object' && raw.keying ? { ...DEFAULT_KEYING_SETTINGS, ...raw.keying } : DEFAULT_KEYING_SETTINGS,
