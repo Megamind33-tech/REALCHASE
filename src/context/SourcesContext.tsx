@@ -4,6 +4,7 @@ import {
   useReducer,
   useRef,
   useEffect,
+  useState,
   useCallback,
   type ReactNode,
 } from 'react';
@@ -74,6 +75,23 @@ interface SourcesValue {
   updateSourceKeying: (id: string, keying: KeyingSettings) => void;
   restoreProjectSources: (sources: Source[], previewId: string | null, programId: string | null) => void;
   roleOf: (id: string) => SourceRole;
+  // Recording (real MediaRecorder → downloadable .webm of the Program output).
+  capturing: boolean;
+  canRecord: boolean;
+  recordLabel: string;
+  toggleCapture: () => void;
+}
+
+function pickRecorderMime(): string {
+  const MR = typeof MediaRecorder !== 'undefined' ? MediaRecorder : undefined;
+  const want = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  for (const m of want) if (MR && MR.isTypeSupported(m)) return m;
+  return 'video/webm';
+}
+
+function fmtTime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 const SourcesContext = createContext<SourcesValue | null>(null);
@@ -90,7 +108,7 @@ function stopStream(stream: MediaStream | null) {
 
 export function SourcesProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const { engine } = useEditorBridge();
+  const { engine, captureOutputStream } = useEditorBridge();
 
   // Always-current mirror so the unmount cleanup can stop every live track.
   const sourcesRef = useRef(state.sources);
@@ -197,6 +215,67 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     [state.previewId, state.programId],
   );
 
+  // --- Real recording: MediaRecorder on the Program output -> downloadable .webm ---
+  const [recording, setRecording] = useState(false);
+  const [recElapsed, setRecElapsed] = useState(0);
+  const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; started: number; timer: number; canvasStream: MediaStream | null } | null>(null);
+  const canRecord = Boolean(programSource?.stream) && typeof MediaRecorder !== 'undefined';
+
+  const stopRecording = useCallback(() => {
+    const r = recRef.current;
+    if (!r) return;
+    clearInterval(r.timer);
+    try { if (r.rec.state !== 'inactive') r.rec.stop(); } catch { /* already stopped */ }
+  }, []);
+
+  const startRecording = useCallback(() => {
+    const program = sourcesRef.current.find((s) => s.id === state.programId);
+    if (!program?.stream || typeof MediaRecorder === 'undefined') return;
+    // Prefer the composited studio output (canvas); fall back to the raw Program
+    // video track if the canvas isn't capturable.
+    const canvasStream = captureOutputStream(30);
+    const videoTracks = canvasStream?.getVideoTracks().length ? canvasStream.getVideoTracks() : program.stream.getVideoTracks();
+    const mixed = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
+    let rec: MediaRecorder;
+    try {
+      rec = new MediaRecorder(mixed, { mimeType: pickRecorderMime() });
+    } catch {
+      return;
+    }
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const blob = new Blob(chunks, { type: rec.mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chase-program-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      canvasStream?.getTracks().forEach((t) => t.stop());
+      recRef.current = null;
+      setRecording(false);
+      setRecElapsed(0);
+    };
+    const started = Date.now();
+    const timer = window.setInterval(() => setRecElapsed(Date.now() - started), 500);
+    recRef.current = { rec, chunks, started, timer, canvasStream };
+    rec.start(1000); // 1s timeslice
+    setRecording(true);
+    setRecElapsed(0);
+  }, [captureOutputStream, state.programId]);
+
+  const toggleRecording = useCallback(() => {
+    if (recording) stopRecording(); else startRecording();
+  }, [recording, startRecording, stopRecording]);
+
+  // Stop recording + timer on unmount (no zombie recorder/interval).
+  useEffect(() => () => { stopRecording(); }, [stopRecording]);
+
+  const recordLabel = recording ? `● REC ${fmtTime(recElapsed)}` : 'REC';
+
   const value: SourcesValue = {
     sources: state.sources,
     previewId: state.previewId,
@@ -211,6 +290,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     updateSourceKeying,
     restoreProjectSources,
     roleOf,
+    capturing: recording,
+    canRecord,
+    recordLabel,
+    toggleCapture: toggleRecording,
   };
 
   return <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>;

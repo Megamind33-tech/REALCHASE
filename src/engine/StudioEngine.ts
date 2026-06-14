@@ -1067,6 +1067,21 @@ export class StudioEngine {
   }
 
   /**
+   * Live MediaStream of the rendered Program output (the studio composite with
+   * the keyed source), for recording/streaming. Null if the canvas isn't
+   * capturable (e.g. the viewport isn't mounted).
+   */
+  captureOutputStream(fps = 30): MediaStream | null {
+    const canvas = this.canvas as (HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }) | null;
+    if (!canvas?.captureStream) return null;
+    try {
+      return canvas.captureStream(fps);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Pause/resume the render loop. Paused when the 3D viewport isn't on screen
    * (e.g. the operator is in the Switcher/another module) so the engine doesn't
    * keep rendering to an off-screen canvas.
