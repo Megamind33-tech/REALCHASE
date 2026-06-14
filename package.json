@@ -12,6 +12,7 @@
     "tauri:build": "tauri build",
     "setup:editor-fork": "powershell -ExecutionPolicy Bypass -File scripts/clone-editor-fork.ps1",
     "test:anti-demo": "node tests/anti-demo-smoke.mjs",
+    "test:output": "node tests/output-preview-smoke.mjs",
     "test:sources": "node tests/source-manager-smoke.mjs",
     "test:visual-smoke": "node tests/browser-visual-smoke.mjs",
     "test:freed": "node --experimental-strip-types tests/freed.test.mjs"

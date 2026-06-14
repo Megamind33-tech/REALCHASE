@@ -38,6 +38,12 @@ const allowedDisabledFragments = [
   'until persistent project service',
   'track live',
   'no live track',
+  'recordingformat',
+  'recording format',
+  'recording-format',
+  'recordingcapabilities',
+  'recordingstats',
+  'recording-telemetry',
 ];
 
 function fail(message) {

@@ -27,6 +27,7 @@ import {
   type SourceRole,
 } from '@/sources/sourceTypes';
 import { acquireImageFile, acquireVideoFile, type AcquiredSourceMedia } from '@/sources/mediaSources';
+import { getRecordingCapabilities, type RecordingCapability, type RecordingFormat } from '@/output/recording';
 
 interface SourcesState {
   sources: Source[];
@@ -93,6 +94,11 @@ interface SourcesValue {
   capturing: boolean;
   canRecord: boolean;
   recordLabel: string;
+  recordingFormat: RecordingFormat;
+  recordingCapabilities: RecordingCapability[];
+  setRecordingFormat: (format: RecordingFormat) => void;
+  recordingStats: { durationMs: number; bytes: number; bitrateKbps: number; mimeType: string | null };
+  recordError: string | null;
   toggleCapture: () => void;
   // Output (real WebRTC/WHIP publish of the Program output to an ingest server).
   onAir: boolean;
@@ -106,13 +112,6 @@ interface SourcesValue {
   updateDestinationLeg: (id: string, kind: LegKind, patch: Partial<OutputLeg>) => void;
   armedTargetCount: number;
   liveWebsite: { whepUrl: string; hlsUrl: string } | null;
-}
-
-function pickRecorderMime(): string {
-  const MR = typeof MediaRecorder !== 'undefined' ? MediaRecorder : undefined;
-  const want = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
-  for (const m of want) if (MR && MR.isTypeSupported(m)) return m;
-  return 'video/webm';
 }
 
 function fmtTime(ms: number): string {
@@ -347,8 +346,25 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   // --- Real recording: MediaRecorder on the Program output -> downloadable .webm ---
   const [recording, setRecording] = useState(false);
   const [recElapsed, setRecElapsed] = useState(0);
-  const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; started: number; timer: number; canvasStream: MediaStream | null } | null>(null);
-  const canRecord = Boolean(programSource?.stream) && typeof MediaRecorder !== 'undefined';
+  const [recBytes, setRecBytes] = useState(0);
+  const [recMimeType, setRecMimeType] = useState<string | null>(null);
+  const [recordingFormat, setRecordingFormatState] = useState<RecordingFormat>('webm');
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const recordingCapabilities = getRecordingCapabilities();
+  const selectedRecordingCapability = recordingCapabilities.find((capability) => capability.format === recordingFormat) ?? recordingCapabilities[0];
+  const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; started: number; timer: number; canvasStream: MediaStream | null; extension: string } | null>(null);
+  const canRecord = Boolean(programSource?.stream) && selectedRecordingCapability.available;
+
+  const setRecordingFormat = useCallback((format: RecordingFormat) => {
+    if (recording) return;
+    const capability = getRecordingCapabilities().find((item) => item.format === format);
+    if (!capability?.available) {
+      setRecordError(capability?.detail ?? 'That recording format is unavailable.');
+      return;
+    }
+    setRecordError(null);
+    setRecordingFormatState(format);
+  }, [recording]);
 
   const stopRecording = useCallback(() => {
     const r = recRef.current;
@@ -360,6 +376,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   const startRecording = useCallback(() => {
     const program = sourcesRef.current.find((s) => s.id === state.programId);
     if (!program?.stream || typeof MediaRecorder === 'undefined') return;
+    const capability = getRecordingCapabilities().find((item) => item.format === recordingFormat);
+    if (!capability?.available || !capability.mimeType) {
+      setRecordError(capability?.detail ?? 'The selected recording format is unavailable.');
+      return;
+    }
     // Prefer the composited studio output (canvas); fall back to the raw Program
     // video track if the canvas isn't capturable.
     const canvasStream = captureOutputStream(30);
@@ -367,18 +388,26 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     const mixed = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(mixed, { mimeType: pickRecorderMime() });
-    } catch {
+      rec = new MediaRecorder(mixed, { mimeType: capability.mimeType });
+    } catch (error) {
+      canvasStream?.getTracks().forEach((t) => t.stop());
+      setRecordError(error instanceof Error ? error.message : 'MediaRecorder could not start.');
       return;
     }
     const chunks: Blob[] = [];
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    let bytes = 0;
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      chunks.push(e.data);
+      bytes += e.data.size;
+      setRecBytes(bytes);
+    };
     rec.onstop = () => {
-      const blob = new Blob(chunks, { type: rec.mimeType || 'video/webm' });
+      const blob = new Blob(chunks, { type: rec.mimeType || capability.mimeType || undefined });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `chase-program-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      a.download = `chase-program-${new Date().toISOString().replace(/[:.]/g, '-')}.${capability.extension}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -386,15 +415,25 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
       canvasStream?.getTracks().forEach((t) => t.stop());
       recRef.current = null;
       setRecording(false);
-      setRecElapsed(0);
     };
     const started = Date.now();
-    const timer = window.setInterval(() => setRecElapsed(Date.now() - started), 500);
-    recRef.current = { rec, chunks, started, timer, canvasStream };
+    let lastDataRequest = 0;
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - started;
+      setRecElapsed(elapsed);
+      if (elapsed - lastDataRequest >= 1000 && rec.state === 'recording') {
+        lastDataRequest = elapsed;
+        try { rec.requestData(); } catch { /* some browser codecs flush only on stop */ }
+      }
+    }, 500);
+    recRef.current = { rec, chunks, started, timer, canvasStream, extension: capability.extension };
+    setRecordError(null);
+    setRecBytes(0);
+    setRecMimeType(capability.mimeType);
     rec.start(1000); // 1s timeslice
     setRecording(true);
     setRecElapsed(0);
-  }, [captureOutputStream, state.programId]);
+  }, [captureOutputStream, recordingFormat, state.programId]);
 
   const toggleRecording = useCallback(() => {
     if (recording) stopRecording(); else startRecording();
@@ -404,6 +443,13 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   useEffect(() => () => { stopRecording(); }, [stopRecording]);
 
   const recordLabel = recording ? `● REC ${fmtTime(recElapsed)}` : 'REC';
+
+  const recordingStats = {
+    durationMs: recElapsed,
+    bytes: recBytes,
+    bitrateKbps: recElapsed > 0 ? Math.round((recBytes * 8) / recElapsed) : 0,
+    mimeType: recMimeType,
+  };
 
   // --- Real output: WebRTC/WHIP publish of the Program output to an ingest server ---
   const [onAir, setOnAir] = useState(false);
@@ -521,6 +567,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     capturing: recording,
     canRecord,
     recordLabel,
+    recordingFormat,
+    recordingCapabilities,
+    setRecordingFormat,
+    recordingStats,
+    recordError,
     toggleCapture: toggleRecording,
     onAir,
     canStream,

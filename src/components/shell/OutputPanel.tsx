@@ -3,6 +3,13 @@ import { useSources } from '@/context/SourcesContext';
 import { AudioMeter } from '@/components/audio/AudioMeter';
 import { TRANSITIONS } from '@/data/mock/studioData';
 import { legSummary, type StreamDestination, type LegKind } from '@/output/destinations';
+import { CompositeOutputPreview } from '@/components/output/CompositeOutputPreview';
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 const legInput: React.CSSProperties = {
   flex: 1, minWidth: 0, fontSize: 9, padding: '2px 5px',
@@ -39,7 +46,8 @@ function LegEditor({ dest, kind, label }: { dest: StreamDestination; kind: LegKi
 export function OutputPanel() {
   const { state } = useShell();
   const {
-    sources, onAir, liveLabel, capturing, recordLabel,
+    sources, programSource, onAir, liveLabel, capturing, recordLabel,
+    recordingFormat, recordingCapabilities, setRecordingFormat, recordingStats, recordError,
     destinations, updateDestination, armedTargetCount, liveWebsite,
   } = useSources();
   const liveAudioSources = sources.filter((s) => s.status === 'live' && s.stream && s.stream.getAudioTracks().length > 0);
@@ -57,6 +65,8 @@ export function OutputPanel() {
       }}
     >
       <div style={{ padding: 8 }}>
+        <CompositeOutputPreview active={Boolean(programSource?.stream)} sourceName={programSource?.name ?? null} />
+
         <div className="section-label" style={{ marginBottom: 6 }}>Transitions</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 8 }}>
           {TRANSITIONS.map((t) => (
@@ -121,9 +131,27 @@ export function OutputPanel() {
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Capture</div>
             <div className="mono" style={{ color: capturing ? 'var(--status-rec)' : 'var(--text-muted)' }}>{capturing ? recordLabel : 'Idle'}</div>
+            <select
+              data-testid="recording-format"
+              aria-label="Recording format"
+              value={recordingFormat}
+              disabled={capturing}
+              onChange={(event) => setRecordingFormat(event.currentTarget.value as typeof recordingFormat)}
+              style={{ width: '100%', height: 24, margin: '5px 0', fontSize: 9 }}
+            >
+              {recordingCapabilities.map((capability) => (
+                <option key={capability.format} value={capability.format} disabled={!capability.available}>
+                  {capability.label}{capability.available ? '' : ' - unavailable'}
+                </option>
+              ))}
+            </select>
             <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
-              {capturing ? 'Writing the Program output to a .webm file.' : 'Idle — start capture from the toolbar.'}
+              {recordingCapabilities.find((item) => item.format === recordingFormat)?.detail}
             </div>
+            <div data-testid="recording-telemetry" className="mono" style={{ marginTop: 5, fontSize: 9, color: 'var(--text-secondary)' }}>
+              {formatBytes(recordingStats.bytes)} - {recordingStats.bitrateKbps} kbps - {recordingStats.mimeType ?? 'not started'}
+            </div>
+            {recordError && <div style={{ marginTop: 4, fontSize: 9, color: 'var(--status-error)' }}>{recordError}</div>}
           </div>
           <div
             data-testid="output-air-tile"
