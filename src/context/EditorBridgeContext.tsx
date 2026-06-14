@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { StudioEngine } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
+import type { NodeTransform } from '@/scenes/sceneTypes';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -17,6 +18,10 @@ interface EditorBridgeValue {
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
   importGltfFiles: (files: File[]) => Promise<number>;
+  captureNodeTransforms: () => NodeTransform[];
+  applyNodeTransforms: (nodes: NodeTransform[]) => { restored: number; missing: number };
+  captureThumbnail: (width?: number) => string;
+  getActiveCameraId: () => string;
   sceneNodes: SceneNodeInfo[];
 }
 
@@ -118,6 +123,17 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     return engine.importGltfFiles(files);
   }, []);
 
+  const captureNodeTransforms = useCallback(() => engineRef.current?.captureNodeTransforms() ?? [], []);
+
+  const applyNodeTransforms = useCallback(
+    (nodes: NodeTransform[]) => engineRef.current?.applyNodeTransforms(nodes) ?? { restored: 0, missing: 0 },
+    [],
+  );
+
+  const captureThumbnail = useCallback((width?: number) => engineRef.current?.captureThumbnail(width) ?? '', []);
+
+  const getActiveCameraId = useCallback(() => engineRef.current?.getActiveCameraId() ?? 'cam1', []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -126,6 +142,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         addObject,
         loadPack,
         importGltfFiles,
+        captureNodeTransforms,
+        applyNodeTransforms,
+        captureThumbnail,
+        getActiveCameraId,
         sceneNodes,
       }}
     >

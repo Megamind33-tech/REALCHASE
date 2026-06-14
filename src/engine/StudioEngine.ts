@@ -395,6 +395,89 @@ export class StudioEngine {
     return true;
   }
 
+  /** The id of the currently active 3D camera. */
+  getActiveCameraId(): CameraId {
+    return this.activeCameraId;
+  }
+
+  /** Capture the local transform of every selectable scene node. Used to save
+   *  a named scene; restored verbatim by applyNodeTransforms. */
+  captureNodeTransforms(): Array<{
+    id: string;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scaling: [number, number, number];
+  }> {
+    if (!this.scene) return [];
+    const out: Array<{
+      id: string;
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scaling: [number, number, number];
+    }> = [];
+    for (const node of this.getSceneNodes()) {
+      const target = this.findMeshById(node.id);
+      if (!target) continue;
+      out.push({
+        id: node.id,
+        position: [target.position.x, target.position.y, target.position.z],
+        rotation: [target.rotation.x, target.rotation.y, target.rotation.z],
+        scaling: [target.scaling.x, target.scaling.y, target.scaling.z],
+      });
+    }
+    return out;
+  }
+
+  /** Restore node transforms captured by captureNodeTransforms. Nodes that no
+   *  longer exist in the scene are skipped (honest partial restore). Returns
+   *  the count restored vs. missing. */
+  applyNodeTransforms(
+    nodes: Array<{
+      id: string;
+      position: [number, number, number];
+      rotation: [number, number, number];
+      scaling: [number, number, number];
+    }>,
+  ): { restored: number; missing: number } {
+    let restored = 0;
+    let missing = 0;
+    for (const n of nodes) {
+      const target = this.findMeshById(n.id);
+      if (!target) {
+        missing += 1;
+        continue;
+      }
+      target.position.set(n.position[0], n.position[1], n.position[2]);
+      target.rotation.set(n.rotation[0], n.rotation[1], n.rotation[2]);
+      target.scaling.set(n.scaling[0], n.scaling[1], n.scaling[2]);
+      restored += 1;
+    }
+    this.emitSceneGraph();
+    return { restored, missing };
+  }
+
+  /** Capture a still of the current viewport as a PNG data URL. Relies on the
+   *  engine's preserveDrawingBuffer:true. Returns '' if the canvas isn't ready. */
+  captureThumbnail(width = 320): string {
+    if (!this.canvas || !this.scene || !this.engine) return '';
+    try {
+      // Force a render so the back buffer holds the current frame.
+      this.scene.render();
+      const src = this.canvas;
+      const ratio = src.height / src.width || 0.5625;
+      const height = Math.round(width * ratio);
+      const off = document.createElement('canvas');
+      off.width = width;
+      off.height = height;
+      const ctx = off.getContext('2d');
+      if (!ctx) return '';
+      ctx.drawImage(src, 0, 0, width, height);
+      return off.toDataURL('image/png');
+    } catch {
+      return '';
+    }
+  }
+
   getSceneNodes(): SceneNodeInfo[] {
     if (!this.scene) return [];
     const nodes = new Map<string, SceneNodeInfo>();
