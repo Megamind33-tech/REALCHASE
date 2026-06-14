@@ -120,7 +120,7 @@ export function OutputPanel() {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>Capture</div>
-            <div className="mono" style={{ color: capturing ? 'var(--status-rec)' : 'var(--text-muted)' }}>{recordLabel}</div>
+            <div className="mono" style={{ color: capturing ? 'var(--status-rec)' : 'var(--text-muted)' }}>{capturing ? recordLabel : 'Idle'}</div>
             <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>
               {capturing ? 'Writing the Program output to a .webm file.' : 'Idle — start capture from the toolbar.'}
             </div>

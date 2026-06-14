@@ -1,10 +1,12 @@
 import {
-  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight,
+  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box,
 } from 'lucide-react';
 import { Tabs, Slider, Toggle } from '@/components/ui/Controls';
 import { useShell } from '@/context/ShellContext';
-import { useSceneNodes } from '@/context/EditorBridgeContext';
-import type { InspectorSubTab } from '@/context/shellTypes';
+import { useSceneNodes, useImportedAssets, useEditorBridge } from '@/context/EditorBridgeContext';
+import type { InspectorSubTab, TransformMode } from '@/context/shellTypes';
+import type { ImportedAsset } from '@/integrations/render-engine/types';
+import { formatBytes } from '@/integrations/render-engine/assetImport';
 import { TIMELINE_LAYERS } from '@/data/mock/studioData';
 
 const SUB_TABS: { id: InspectorSubTab; icon: typeof LayoutGrid; label: string }[] = [
@@ -21,6 +23,8 @@ const LAYOUT_PRESETS = ['Standard', 'Wide', 'Split', 'Minimal'];
 export function Inspector() {
   const { state, dispatch } = useShell();
   const sceneNodes = useSceneNodes();
+  const assets = useImportedAssets();
+  const selectedAsset = assets.find((a) => a.id === state.selectedObjectId) ?? null;
 
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
@@ -105,6 +109,14 @@ export function Inspector() {
           </div>
 
           <div className="scroll-y" style={{ flex: 1, padding: 8 }}>
+            {selectedAsset && (
+              <AssetInspector
+                asset={selectedAsset}
+                transformMode={state.transformMode}
+                onTransformMode={(mode) => dispatch({ type: 'SET_TRANSFORM_MODE', mode })}
+              />
+            )}
+
             <div className="section-label" style={{ marginBottom: 8 }}>
               {state.selectedObjectId === 'desk' ? 'News Desk' : state.selectedObjectId}
             </div>
@@ -213,6 +225,100 @@ export function Inspector() {
         </div>
       )}
     </aside>
+  );
+}
+
+const DEG = 180 / Math.PI;
+
+function Vec3Row({ label, values, unit, onChange }: {
+  label: string; values: [number, number, number]; unit?: string;
+  onChange: (next: [number, number, number]) => void;
+}) {
+  const axes = ['X', 'Y', 'Z'] as const;
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>
+        <span>{label}</span>{unit && <span>{unit}</span>}
+      </div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {axes.map((axis, i) => (
+          <input
+            key={axis}
+            type="number"
+            step={0.1}
+            value={Number.isFinite(values[i]) ? Math.round(values[i] * 1000) / 1000 : 0}
+            aria-label={`${label} ${axis}`}
+            onChange={(e) => {
+              const next: [number, number, number] = [...values];
+              next[i] = parseFloat(e.currentTarget.value);
+              if (Number.isFinite(next[i])) onChange(next);
+            }}
+            style={{ width: '33%', minWidth: 0, fontSize: 9, padding: '2px 4px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const TRANSFORM_TOOLS: { id: TransformMode; icon: typeof Move; label: string }[] = [
+  { id: 'translate', icon: Move, label: 'Move' },
+  { id: 'rotate', icon: RotateCw, label: 'Rotate' },
+  { id: 'scale', icon: Maximize2, label: 'Scale' },
+];
+
+function AssetInspector({ asset, transformMode, onTransformMode }: {
+  asset: ImportedAsset; transformMode: TransformMode; onTransformMode: (mode: TransformMode) => void;
+}) {
+  const { setAssetTransform } = useEditorBridge();
+  const t = asset.transform;
+  const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
+  return (
+    <div
+      data-testid="asset-inspector"
+      style={{ border: '1px solid var(--accent-blue)', borderRadius: 4, padding: 8, marginBottom: 10, background: 'var(--bg-panel-raised)' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <Box size={13} style={{ color: 'var(--accent-blue)' }} />
+        <span style={{ flex: 1, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={asset.name}>{asset.name}</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px', fontSize: 9, color: 'var(--text-muted)', marginBottom: 8 }}>
+        <span>Type</span><span className="mono" style={{ textAlign: 'right' }}>{asset.format.toUpperCase()} model</span>
+        <span>File size</span><span className="mono" style={{ textAlign: 'right' }}>{formatBytes(asset.fileBytes)}</span>
+        <span>Meshes</span><span className="mono" style={{ textAlign: 'right' }}>{asset.meshCount}</span>
+        <span>Vertices</span><span className="mono" style={{ textAlign: 'right' }}>{asset.vertexCount.toLocaleString()}</span>
+      </div>
+
+      {asset.heavy && (
+        <div data-testid="heavy-asset-warning" style={{ fontSize: 9, color: 'var(--status-warn)', border: '1px solid var(--status-warn)', borderRadius: 3, padding: 6, marginBottom: 8, lineHeight: 1.4 }}>
+          Heavy asset ({asset.heavyReason}). It can lower the studio frame rate — simplify or remove it if the viewport stutters.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+        {TRANSFORM_TOOLS.map(({ id, icon: Icon, label }) => (
+          <button
+            key={id}
+            onClick={() => onTransformMode(id)}
+            aria-label={`${label} tool`}
+            title={`${label} tool`}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px 0', fontSize: 9,
+              borderRadius: 3, border: `1px solid ${transformMode === id ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+              background: transformMode === id ? 'var(--accent-blue-dim)' : 'transparent',
+              color: transformMode === id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+            }}
+          >
+            <Icon size={11} /> {label}
+          </button>
+        ))}
+      </div>
+
+      <Vec3Row label="Position" values={t.position} onChange={(v) => setAssetTransform(asset.id, { position: v })} />
+      <Vec3Row label="Rotation" unit="°" values={rotDeg} onChange={(v) => setAssetTransform(asset.id, { rotation: [v[0] / DEG, v[1] / DEG, v[2] / DEG] })} />
+      <Vec3Row label="Scale" values={t.scaling} onChange={(v) => setAssetTransform(asset.id, { scaling: v })} />
+    </div>
   );
 }
 

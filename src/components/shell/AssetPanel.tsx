@@ -1,4 +1,5 @@
-import { Search, Filter, ChevronLeft, Box, Monitor, Lamp, Circle, Leaf, Armchair } from 'lucide-react';
+import { useRef } from 'react';
+import { Search, Filter, ChevronLeft, Box, Monitor, Lamp, Circle, Leaf, Armchair, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { Tabs, Chip } from '@/components/ui/Controls';
@@ -6,6 +7,8 @@ import {
   CATEGORIES, STUDIO_PACKS, SCENE_OBJECTS, LIGHTING_PRESETS,
 } from '@/data/mock/studioData';
 import type { AssetTab } from '@/context/shellTypes';
+import { AssetImportError } from '@/integrations/render-engine/types';
+import { formatBytes } from '@/integrations/render-engine/assetImport';
 
 const objectIcons: Record<string, typeof Box> = {
   desk: Box,
@@ -18,19 +21,23 @@ const objectIcons: Record<string, typeof Box> = {
 
 export function AssetPanel() {
   const { state, dispatch } = useShell();
-  const { addObject, importGltfFiles } = useEditorBridge();
+  const { addObject, importAsset, assets, removeAsset } = useEditorBridge();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-
-
-  const handleAssetDrop = async (files: File[]) => {
-    try {
-      const count = await importGltfFiles(files);
-      dispatch({ type: 'SHOW_TOAST', message: `Imported ${count} glTF mesh${count === 1 ? '' : 'es'}` });
-    } catch (error) {
-      dispatch({
-        type: 'SHOW_TOAST',
-        message: error instanceof Error ? error.message : 'Unable to import glTF asset',
-      });
+  const importFiles = async (files: File[]) => {
+    const candidates = files.filter((f) => f.size >= 0);
+    if (candidates.length === 0) return;
+    for (const file of candidates) {
+      try {
+        const asset = await importAsset(file);
+        dispatch({ type: 'SHOW_TOAST', message: `Imported ${asset.name} — ${asset.meshCount} mesh${asset.meshCount === 1 ? '' : 'es'}, ${asset.vertexCount.toLocaleString()} verts` });
+      } catch (error) {
+        // Precise, honest failure states per the typed import errors.
+        const message = error instanceof AssetImportError
+          ? error.message
+          : error instanceof Error ? error.message : 'Unable to import asset';
+        dispatch({ type: 'SHOW_TOAST', message });
+      }
     }
   };
 
@@ -208,22 +215,82 @@ export function AssetPanel() {
           ))}
         </div>
 
-        <div
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            void handleAssetDrop(Array.from(e.dataTransfer.files));
-          }}
-          style={{
-            border: '1px dashed var(--border-active)',
-            borderRadius: 3,
-            padding: 16,
-            textAlign: 'center',
-            color: 'var(--text-muted)',
-            fontSize: 10,
-          }}
-        >
-          Drag &amp; drop .glb or .gltf assets into the scene
+        <div data-testid="asset-import-panel">
+          <div className="section-label" style={{ marginBottom: 6 }}>Import 3D Asset</div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
+            multiple
+            hidden
+            data-testid="asset-file-input"
+            aria-label="Import 3D asset file"
+            onChange={(e) => { void importFiles(Array.from(e.currentTarget.files ?? [])); e.currentTarget.value = ''; }}
+          />
+          <button
+            data-testid="import-asset-button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '8px 6px', fontSize: 10, color: 'var(--text-secondary)',
+              border: '1px solid var(--border-active)', borderRadius: 3, background: 'var(--bg-panel-raised)',
+            }}
+          >
+            <Upload size={12} /> Import .glb / .gltf
+          </button>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); void importFiles(Array.from(e.dataTransfer.files)); }}
+            style={{
+              marginTop: 6, border: '1px dashed var(--border-subtle)', borderRadius: 3,
+              padding: 10, textAlign: 'center', color: 'var(--text-muted)', fontSize: 9,
+            }}
+          >
+            …or drop a .glb / .gltf file here
+          </div>
+
+          {assets.length > 0 && (
+            <div data-testid="imported-asset-list" style={{ marginTop: 10 }}>
+              <div className="section-label" style={{ marginBottom: 6 }}>In Scene · {assets.length}</div>
+              {assets.map((a) => {
+                const selected = state.selectedObjectId === a.id;
+                return (
+                  <div
+                    key={a.id}
+                    data-testid={`imported-asset-${a.id}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', marginBottom: 3,
+                      borderRadius: 3, fontSize: 10,
+                      background: selected ? 'var(--accent-blue-dim)' : 'var(--bg-panel-raised)',
+                      border: `1px solid ${selected ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                    }}
+                  >
+                    <button
+                      onClick={() => dispatch({ type: 'SET_OBJECT', id: a.id })}
+                      title={`${a.name} · ${a.format.toUpperCase()} · ${formatBytes(a.fileBytes)} · ${a.vertexCount.toLocaleString()} verts`}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'none', border: 'none', color: selected ? 'var(--accent-blue)' : 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {a.name}
+                    </button>
+                    {a.heavy && (
+                      <span title={`Heavy asset: ${a.heavyReason}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--status-warn)', fontSize: 8 }}>
+                        <AlertTriangle size={10} /> Heavy
+                      </span>
+                    )}
+                    <span className="mono" style={{ fontSize: 8, color: 'var(--text-muted)' }}>{formatBytes(a.fileBytes)}</span>
+                    <button
+                      onClick={() => { removeAsset(a.id); dispatch({ type: 'SHOW_TOAST', message: `Removed ${a.name}` }); }}
+                      aria-label={`Remove ${a.name}`}
+                      title={`Remove ${a.name}`}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </aside>

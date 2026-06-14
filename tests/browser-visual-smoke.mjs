@@ -29,7 +29,10 @@ async function assertNoFakeProductionText(page, surfaceTestId) {
     if (term.test(text)) throw new Error(`${surfaceTestId} shows forbidden fake-production text matching ${term}:\n${text}`);
   }
   for (const line of text.split(/\n+/).map((value) => value.trim()).filter(Boolean)) {
-    const activeProduction = /\bLIVE\b|\bREC\b|\bready\b|streaming|recording|connected/i.test(line);
+    // Mirror the authoritative anti-demo gate: the acronyms LIVE/REC are
+    // case-sensitive (so "live input" as an adjective is fine), while
+    // streaming/recording/connected/ready are matched case-insensitively.
+    const activeProduction = /\bLIVE\b|\bREC\b/.test(line) || /\bready\b|streaming|recording|connected/i.test(line);
     const realSourceTrackState = /TRACK LIVE|NO LIVE TRACK/i.test(line);
     if (activeProduction && !realSourceTrackState && !honestContext.test(line)) {
       throw new Error(`${surfaceTestId} has active-looking production copy without honest disabled context: "${line}"`);
@@ -37,13 +40,24 @@ async function assertNoFakeProductionText(page, surfaceTestId) {
   }
 }
 
-async function assertDisabledStatus(page, testId) {
+// REC and GO LIVE are real controls (PR #18–#22). At load, with no Program
+// source, they must be a genuine toggle sitting idle: off (aria-pressed=false),
+// showing the idle label — never a fake active state ("● ON AIR", a timer) — and
+// when disabled they must explain why in the title.
+const idleReason = /put a source on program|requires|disabled|not wired|reconnect|to publish|to capture/i;
+
+async function assertRealIdleToggle(page, testId) {
   const element = page.getByTestId(testId);
   await element.waitFor({ state: 'visible', timeout: 15_000 });
-  const disabled = await element.evaluate((node) => node instanceof HTMLButtonElement ? node.disabled : node.getAttribute('aria-disabled') === 'true');
-  if (!disabled) throw new Error(`${testId} is visible but not disabled`);
-  const text = await element.innerText();
-  if (!honestContext.test(text)) throw new Error(`${testId} lacks honest disabled context: "${text}"`);
+  const info = await element.evaluate((node) => ({
+    disabled: node instanceof HTMLButtonElement ? node.disabled : node.getAttribute('aria-disabled') === 'true',
+    pressed: node.getAttribute('aria-pressed'),
+    text: node.innerText,
+    title: node.getAttribute('title') || '',
+  }));
+  if (info.pressed === 'true') throw new Error(`${testId} is reporting an active (pressed) state at idle`);
+  if (/●|ON AIR|\d:\d\d/.test(info.text)) throw new Error(`${testId} shows a fake active label at idle: "${info.text}"`);
+  if (info.disabled && !idleReason.test(info.title)) throw new Error(`${testId} is disabled without an honest reason: "${info.title}"`);
 }
 
 async function main() {
@@ -57,8 +71,11 @@ async function main() {
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.getByTestId('builder-surface').waitFor({ state: 'visible', timeout: 15_000 });
   await assertNoFakeProductionText(page, 'builder-surface');
-  await assertDisabledStatus(page, 'record-status');
-  await assertDisabledStatus(page, 'live-status');
+  await assertRealIdleToggle(page, 'record-status');
+  await assertRealIdleToggle(page, 'live-status');
+  // The 3D asset import panel is a real, present control in the builder.
+  await page.getByTestId('asset-import-panel').waitFor({ state: 'visible', timeout: 15_000 });
+  await page.getByTestId('import-asset-button').waitFor({ state: 'visible', timeout: 15_000 });
   await page.screenshot({ path: resolve(evidenceDir, 'builder-surface.png'), fullPage: true });
 
   await page.getByRole('button', { name: /switcher/i }).click();

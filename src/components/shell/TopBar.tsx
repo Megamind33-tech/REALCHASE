@@ -5,6 +5,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
+import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { buildProjectFile, parseProjectFile, saveProjectFile } from '@/projectPersistence';
 
 const DEFAULT_INGEST_URL = 'http://localhost:8889/chase/whip';
@@ -16,6 +17,7 @@ export function TopBar() {
     capturing, canRecord, recordLabel, toggleCapture,
     onAir, canStream, liveLabel, streamError, toggleAir,
   } = useSources();
+  const { serializeAssets, restoreAssets } = useEditorBridge();
   const openRef = useRef<HTMLInputElement>(null);
   const [ingestUrl, setIngestUrl] = useState(DEFAULT_INGEST_URL);
   const { metrics } = state;
@@ -27,7 +29,7 @@ export function TopBar() {
 
   const saveProject = async () => {
     try {
-      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId));
+      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId, serializeAssets()));
       dispatch({ type: 'SHOW_TOAST', message: path === 'cancelled' ? 'Save Project cancelled' : `Saved project: ${path}` });
     } catch (error) {
       dispatch({ type: 'SHOW_TOAST', message: `Save Project failed: ${error instanceof Error ? error.message : 'unknown error'}` });
@@ -42,7 +44,11 @@ export function TopBar() {
     try {
       const restored = parseProjectFile(await file.text());
       restoreProjectSources(restored.sources, restored.previewId, restored.programId);
-      dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}. Live sources need reconnection.` });
+      const { restored: ok, skipped } = await restoreAssets(restored.assets);
+      const assetNote = restored.assets.length
+        ? ` Restored ${ok} asset${ok === 1 ? '' : 's'}${skipped ? `, ${skipped} need re-import` : ''}.`
+        : '';
+      dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}.${assetNote} Live sources need reconnection.` });
     } catch (error) {
       dispatch({ type: 'SHOW_TOAST', message: `Open Project failed: ${error instanceof Error ? error.message : 'invalid file'}` });
     }

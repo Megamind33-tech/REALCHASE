@@ -40,6 +40,13 @@ import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sc
 import { LAYER_TO_OBJECT } from './sceneRegistry';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
 import { DEFAULT_KEYING_SETTINGS, type KeyingSettings, type PlacementMode } from '@/sources/sourceTypes';
+import {
+  validateAssetFile, assertNotCorrupt, assessHeaviness, canEmbed,
+  bytesToBase64, base64ToBytes,
+} from '@/integrations/render-engine/assetImport';
+import {
+  AssetImportError, type ImportedAsset, type SerializedAsset, type AssetTransform,
+} from '@/integrations/render-engine/types';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -51,7 +58,17 @@ export type StudioEngineEvent =
   | { type: 'selected'; objectId: string | null }
   | { type: 'scene-graph'; nodes: SceneNodeInfo[] }
   | { type: 'tracking'; status: TrackingStatus; message?: string }
+  | { type: 'assets'; assets: ImportedAsset[] }
+  | { type: 'asset-warning'; message: string }
   | { type: 'error'; message: string };
+
+interface ImportedAssetRecord {
+  id: string;
+  name: string;
+  format: 'glb' | 'gltf';
+  fileBytes: number;
+  bytes: Uint8Array;
+}
 
 // Minimal unlit textured shader for the Program media plane. Babylon's
 // StandardMaterial texture sampling misbehaves on some software-WebGL backends
@@ -178,6 +195,10 @@ export class StudioEngine {
   private adaptiveStep = 0;
   private lowFpsRenders = 0;
   private packNodes: Array<AbstractMesh | TransformNode> = [];
+  // Imported 3D assets (GLB/glTF) the operator has brought into the stage. The
+  // original bytes are kept so the placement can be saved into a project and
+  // restored on reload.
+  private importedAssets = new Map<string, ImportedAssetRecord>();
   // Program media (live source rendered as a separate, selectable scene object).
   private programPlane: Mesh | null = null;
   private programTexture: VideoTexture | null = null;
@@ -214,6 +235,7 @@ export class StudioEngine {
     this.gizmoManager.positionGizmoEnabled = true;
     this.gizmoManager.rotationGizmoEnabled = false;
     this.gizmoManager.scaleGizmoEnabled = false;
+    this.attachGizmoObservers();
 
     // Freeze materials that never change so Babylon skips their per-frame
     // readiness/dirty checks. The dynamic ones (desk, floor, desk-screen, and
@@ -400,32 +422,201 @@ export class StudioEngine {
     }
   }
 
-  async importGltfFiles(files: File[]) {
+  /** Drag-and-drop / multi-file path: import every supported file in turn. */
+  async importGltfFiles(files: File[]): Promise<number> {
+    const supported = files.filter((file) => /\.(glb|gltf)$/i.test(file.name));
+    if (supported.length === 0) throw new AssetImportError('unsupported', 'Drop a .glb or .gltf file.');
+    let count = 0;
+    for (const file of supported) { await this.importAsset(file); count += 1; }
+    return count;
+  }
+
+  /**
+   * Import one GLB/glTF file into the stage as a real, selectable, transformable
+   * asset. Validates the file first (unsupported / empty / oversized / corrupt
+   * all throw a typed AssetImportError) and flags heavy assets that could hurt
+   * performance. Returns the live asset descriptor.
+   */
+  async importAsset(file: File): Promise<ImportedAsset> {
     if (!this.scene) throw new Error('Scene is not ready');
-    const assets = files.filter((file) => /\.(glb|gltf)$/i.test(file.name));
-    if (assets.length === 0) throw new Error('Drop a .glb or .gltf file');
+    const format = validateAssetFile({ name: file.name, size: file.size });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    assertNotCorrupt(format, bytes);
 
-    files.forEach((file) => {
-      FilesInputStore.FilesToLoad[file.name.toLowerCase()] = file;
-    });
-
-    let importedCount = 0;
-    let firstImportedId: string | null = null;
-    for (const file of assets) {
-      const extension = file.name.toLowerCase().endsWith('.glb') ? '.glb' : '.gltf';
-      const result = await ImportMeshAsync(file, this.scene, {
-        pluginExtension: extension,
+    // Make the file available to Babylon's loader, then import.
+    const importFile = new File([bytes], file.name, { type: file.type || 'model/gltf-binary' });
+    FilesInputStore.FilesToLoad[file.name.toLowerCase()] = importFile;
+    const beforeMeshes = new Set(this.scene.meshes);
+    let result;
+    try {
+      result = await ImportMeshAsync(importFile, this.scene, {
+        pluginExtension: format === 'glb' ? '.glb' : '.gltf',
         name: file.name,
       });
-      const nodes: Array<AbstractMesh | TransformNode> = [...result.meshes, ...result.transformNodes];
-      this.tagImportedRoots(nodes, file.name.replace(/\.(glb|gltf)$/i, ''));
-      firstImportedId ??= nodes.find((node) => node.metadata?.imported === true)?.metadata?.chaseId ?? null;
-      importedCount += result.meshes.length;
+    } catch (err) {
+      throw new AssetImportError('corrupt', `"${file.name}" could not be loaded: ${err instanceof Error ? err.message : 'unknown error'}`);
     }
 
+    const nodes: Array<AbstractMesh | TransformNode> = [...result.meshes, ...result.transformNodes];
+    const baseName = file.name.replace(/\.(glb|gltf)$/i, '');
+    this.tagImportedRoots(nodes, baseName);
+    const rootId =
+      nodes.find((n) => n.metadata?.imported === true && (!n.parent || !nodes.includes(n.parent as AbstractMesh | TransformNode)))?.metadata?.chaseId ??
+      nodes.find((n) => n.metadata?.imported === true)?.metadata?.chaseId ?? null;
+    if (!rootId) throw new AssetImportError('corrupt', `"${file.name}" contained no importable geometry.`);
+
+    // Give the root a friendly display name from the file.
+    const rootNode = this.findMeshById(rootId);
+    if (rootNode && rootNode.metadata) rootNode.metadata.displayName = baseName;
+
+    const newMeshes = this.scene.meshes.filter((m) => !beforeMeshes.has(m));
+    const vertexCount = newMeshes.reduce((sum, m) => sum + (m.getTotalVertices?.() ?? 0), 0);
+    this.importedAssets.set(rootId, { id: rootId, name: baseName, format, fileBytes: file.size, bytes });
+
     this.emitSceneGraph();
-    if (firstImportedId) this.selectObject(firstImportedId);
-    return importedCount;
+    this.selectObject(rootId);
+    this.emitAssets();
+
+    const descriptor = this.describeAsset(rootId)!;
+    if (descriptor.heavy) {
+      this.emit({ type: 'asset-warning', message: `Heavy asset "${descriptor.name}" (${descriptor.heavyReason}) — performance may drop.` });
+    }
+    return { ...descriptor, vertexCount };
+  }
+
+  /** Build the engine-neutral descriptor for an imported asset id. */
+  private describeAsset(id: string): ImportedAsset | null {
+    const rec = this.importedAssets.get(id);
+    const node = this.findMeshById(id);
+    if (!rec || !node) return null;
+    const meshes = this.scene?.meshes.filter((m) => this.rootOf(m) === id) ?? [];
+    const vertexCount = meshes.reduce((sum, m) => sum + (m.getTotalVertices?.() ?? 0), 0);
+    const heaviness = assessHeaviness({ fileBytes: rec.fileBytes, vertexCount });
+    return {
+      id,
+      name: rec.name,
+      format: rec.format,
+      fileBytes: rec.fileBytes,
+      meshCount: meshes.filter((m) => (m.getTotalVertices?.() ?? 0) > 0).length,
+      vertexCount,
+      transform: this.readTransform(id),
+      heavy: heaviness.heavy,
+      heavyReason: heaviness.reason,
+    };
+  }
+
+  /** Walk up to the imported-root chaseId a mesh belongs to (or its own id). */
+  private rootOf(node: AbstractMesh | TransformNode): string | null {
+    let cur: AbstractMesh | TransformNode | null = node;
+    while (cur) {
+      const id = cur.metadata?.chaseId as string | undefined;
+      if (id && this.importedAssets.has(id)) return id;
+      cur = (cur.parent as AbstractMesh | TransformNode | null) ?? null;
+    }
+    return null;
+  }
+
+  private readTransform(id: string): AssetTransform {
+    const node = this.findMeshById(id);
+    if (!node) return { position: [0, 0, 0], rotation: [0, 0, 0], scaling: [1, 1, 1] };
+    const rot = node.rotationQuaternion ? node.rotationQuaternion.toEulerAngles() : node.rotation;
+    return {
+      position: [node.position.x, node.position.y, node.position.z],
+      rotation: [rot.x, rot.y, rot.z],
+      scaling: [node.scaling.x, node.scaling.y, node.scaling.z],
+    };
+  }
+
+  /** Apply a transform to an imported asset root (inspector numeric edits). */
+  setAssetTransform(id: string, t: Partial<AssetTransform>) {
+    const node = this.findMeshById(id);
+    if (!node) return;
+    this.markInteraction();
+    if (t.position) node.position.set(t.position[0], t.position[1], t.position[2]);
+    if (t.rotation) { node.rotationQuaternion = null; node.rotation.set(t.rotation[0], t.rotation[1], t.rotation[2]); }
+    if (t.scaling) node.scaling.set(t.scaling[0], t.scaling[1], t.scaling[2]);
+    this.emitAssets();
+  }
+
+  /** Remove an imported asset and its meshes from the stage. */
+  removeAsset(id: string) {
+    const node = this.findMeshById(id);
+    if (node) {
+      const subtree = [node, ...node.getChildren((): boolean => true, false)] as Array<AbstractMesh | TransformNode>;
+      subtree.forEach((n) => { if (!n.isDisposed()) n.dispose(); });
+    }
+    this.importedAssets.delete(id);
+    if (this.selectedId === id) this.selectObject('desk');
+    this.emitSceneGraph();
+    this.emitAssets();
+  }
+
+  getImportedAssets(): ImportedAsset[] {
+    return [...this.importedAssets.keys()].map((id) => this.describeAsset(id)).filter((a): a is ImportedAsset => a !== null);
+  }
+
+  getAssetInfo(id: string): ImportedAsset | null {
+    return this.describeAsset(id);
+  }
+
+  private emitAssets() {
+    this.emit({ type: 'assets', assets: this.getImportedAssets() });
+  }
+
+  /** Serialize imported assets for a project file (embeds small geometry). */
+  serializeAssets(): SerializedAsset[] {
+    return [...this.importedAssets.values()].map((rec) => {
+      const embedded = canEmbed(rec.fileBytes);
+      return {
+        id: rec.id,
+        name: rec.name,
+        format: rec.format,
+        fileBytes: rec.fileBytes,
+        transform: this.readTransform(rec.id),
+        data: embedded ? bytesToBase64(rec.bytes) : null,
+        embedded,
+      };
+    });
+  }
+
+  /** Restore imported assets from a project file. Returns counts for the UI. */
+  async restoreAssets(assets: SerializedAsset[]): Promise<{ restored: number; skipped: number }> {
+    if (!this.scene) return { restored: 0, skipped: 0 };
+    // Clear any currently-imported assets first so reload is deterministic.
+    [...this.importedAssets.keys()].forEach((id) => this.removeAsset(id));
+    let restored = 0;
+    let skipped = 0;
+    for (const a of assets) {
+      if (!a.embedded || !a.data) { skipped += 1; continue; }
+      try {
+        const bytes = base64ToBytes(a.data);
+        const fileName = `${a.name}.${a.format}`;
+        const descriptor = await this.importAsset(new File([bytes], fileName, { type: 'model/gltf-binary' }));
+        // Re-key to the saved id, apply the saved transform, and re-select so the
+        // inspector tracks the restored id.
+        this.renameAssetId(descriptor.id, a.id);
+        this.setAssetTransform(a.id, a.transform);
+        this.selectObject(a.id);
+        restored += 1;
+      } catch {
+        skipped += 1;
+      }
+    }
+    this.emitSceneGraph();
+    this.emitAssets();
+    return { restored, skipped };
+  }
+
+  private renameAssetId(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const node = this.findMeshById(fromId);
+    if (node && node.metadata) node.metadata.chaseId = toId;
+    const rec = this.importedAssets.get(fromId);
+    if (rec) {
+      this.importedAssets.delete(fromId);
+      this.importedAssets.set(toId, { ...rec, id: toId });
+    }
+    if (this.selectedId === fromId) this.selectedId = toId;
   }
 
   selectObject(id: string) {
@@ -456,6 +647,25 @@ export class StudioEngine {
     this.gizmoManager.positionGizmoEnabled = mode === 'translate' || mode === 'select';
     this.gizmoManager.rotationGizmoEnabled = mode === 'rotate';
     this.gizmoManager.scaleGizmoEnabled = mode === 'scale';
+    this.attachGizmoObservers();
+  }
+
+  // Gizmos are created lazily as each mode is first enabled; attach the
+  // drag-end listener to any that now exist (guarded so it fires once each).
+  private gizmoObserved = new WeakSet<object>();
+  private attachGizmoObservers() {
+    if (!this.gizmoManager) return;
+    const onDragEnd = () => { this.markInteraction(); this.emitAssets(); };
+    for (const g of [
+      this.gizmoManager.gizmos.positionGizmo,
+      this.gizmoManager.gizmos.rotationGizmo,
+      this.gizmoManager.gizmos.scaleGizmo,
+    ]) {
+      if (g && !this.gizmoObserved.has(g)) {
+        g.onDragEndObservable.add(onDragEnd);
+        this.gizmoObserved.add(g);
+      }
+    }
   }
 
   focusSelection() {
