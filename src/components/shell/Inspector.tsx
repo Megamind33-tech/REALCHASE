@@ -1,11 +1,12 @@
+import { useRef } from 'react';
 import {
-  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box,
+  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { Tabs, Slider, Toggle } from '@/components/ui/Controls';
 import { useShell } from '@/context/ShellContext';
-import { useSceneNodes, useImportedAssets, useEditorBridge } from '@/context/EditorBridgeContext';
+import { useSceneNodes, useImportedAssets, useAssetGroups, useEditorBridge } from '@/context/EditorBridgeContext';
 import type { InspectorSubTab, TransformMode } from '@/context/shellTypes';
-import type { ImportedAsset } from '@/integrations/render-engine/types';
+import type { ImportedAsset, AssetGroup } from '@/integrations/render-engine/types';
 import { formatBytes } from '@/integrations/render-engine/assetImport';
 import { TIMELINE_LAYERS } from '@/data/mock/studioData';
 
@@ -24,7 +25,9 @@ export function Inspector() {
   const { state, dispatch } = useShell();
   const sceneNodes = useSceneNodes();
   const assets = useImportedAssets();
+  const groups = useAssetGroups();
   const selectedAsset = assets.find((a) => a.id === state.selectedObjectId) ?? null;
+  const selectedGroup = groups.find((g) => g.id === state.selectedObjectId) ?? null;
 
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
@@ -109,6 +112,13 @@ export function Inspector() {
           </div>
 
           <div className="scroll-y" style={{ flex: 1, padding: 8 }}>
+            {selectedGroup && (
+              <GroupInspector
+                group={selectedGroup}
+                transformMode={state.transformMode}
+                onTransformMode={(mode) => dispatch({ type: 'SET_TRANSFORM_MODE', mode })}
+              />
+            )}
             {selectedAsset && (
               <AssetInspector
                 asset={selectedAsset}
@@ -270,7 +280,8 @@ const TRANSFORM_TOOLS: { id: TransformMode; icon: typeof Move; label: string }[]
 function AssetInspector({ asset, transformMode, onTransformMode }: {
   asset: ImportedAsset; transformMode: TransformMode; onTransformMode: (mode: TransformMode) => void;
 }) {
-  const { setAssetTransform } = useEditorBridge();
+  const { setAssetTransform, setAssetReferenceMode, setAssetReferencePath, relinkAsset } = useEditorBridge();
+  const relinkRef = useRef<HTMLInputElement>(null);
   const t = asset.transform;
   const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
   return (
@@ -296,6 +307,46 @@ function AssetInspector({ asset, transformMode, onTransformMode }: {
         </div>
       )}
 
+      {/* Storage / external-reference controls */}
+      <div data-testid="asset-storage" style={{ marginBottom: 8 }}>
+        {asset.missing ? (
+          <div data-testid="missing-asset-warning" style={{ fontSize: 9, color: 'var(--status-rec)', border: '1px solid var(--status-rec)', borderRadius: 3, padding: 6, lineHeight: 1.4 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600 }}><AlertTriangle size={10} /> External file missing</span>
+            <div style={{ marginTop: 3, wordBreak: 'break-all', color: 'var(--text-muted)' }}>{asset.referencePath}</div>
+            <button
+              data-testid="relink-asset-button"
+              onClick={() => relinkRef.current?.click()}
+              style={{ marginTop: 5, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '3px 7px', borderRadius: 3, border: '1px solid var(--status-rec)', background: 'transparent', color: 'var(--status-rec)' }}
+            >
+              <RefreshCw size={10} /> Relink file
+            </button>
+            <input
+              ref={relinkRef} type="file" accept=".glb,.gltf" hidden aria-label="Relink asset file"
+              onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) void relinkAsset(asset.id, f); e.currentTarget.value = ''; }}
+            />
+          </div>
+        ) : (
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 9, color: 'var(--text-secondary)', marginBottom: asset.referenceMode ? 4 : 0 }}>
+              <input type="checkbox" checked={asset.referenceMode} aria-label="External reference" onChange={(e) => setAssetReferenceMode(asset.id, e.currentTarget.checked)} />
+              <Link2 size={10} /> External reference (don&apos;t embed in project)
+            </label>
+            {asset.referenceMode && (
+              <input
+                aria-label="Reference path"
+                placeholder="https://… or file path"
+                value={asset.referencePath}
+                onChange={(e) => setAssetReferencePath(asset.id, e.currentTarget.value)}
+                style={{ width: '100%', fontSize: 9, padding: '3px 5px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)' }}
+              />
+            )}
+            <div style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 3 }}>
+              {asset.embedded ? 'Embedded in project file.' : 'Referenced — resolved from its path on reload.'}
+            </div>
+          </>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
         {TRANSFORM_TOOLS.map(({ id, icon: Icon, label }) => (
           <button
@@ -318,6 +369,49 @@ function AssetInspector({ asset, transformMode, onTransformMode }: {
       <Vec3Row label="Position" values={t.position} onChange={(v) => setAssetTransform(asset.id, { position: v })} />
       <Vec3Row label="Rotation" unit="°" values={rotDeg} onChange={(v) => setAssetTransform(asset.id, { rotation: [v[0] / DEG, v[1] / DEG, v[2] / DEG] })} />
       <Vec3Row label="Scale" values={t.scaling} onChange={(v) => setAssetTransform(asset.id, { scaling: v })} />
+    </div>
+  );
+}
+
+function GroupInspector({ group, transformMode, onTransformMode }: {
+  group: AssetGroup; transformMode: TransformMode; onTransformMode: (mode: TransformMode) => void;
+}) {
+  // Groups are transformed via the same engine path as assets (the group is a
+  // real transform node); moving it preserves every child's local transform.
+  const { setAssetTransform } = useEditorBridge();
+  const t = group.transform;
+  const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
+  return (
+    <div
+      data-testid="group-inspector"
+      style={{ border: '1px solid var(--accent-blue)', borderRadius: 4, padding: 8, marginBottom: 10, background: 'var(--bg-panel-raised)' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <Folder size={13} style={{ color: 'var(--accent-blue)' }} />
+        <span style={{ flex: 1, fontSize: 11, fontWeight: 600 }} title={group.name}>{group.name}</span>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{group.childIds.length} asset{group.childIds.length === 1 ? '' : 's'}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+        {TRANSFORM_TOOLS.map(({ id, icon: Icon, label }) => (
+          <button
+            key={id}
+            onClick={() => onTransformMode(id)}
+            aria-label={`Group ${label} tool`}
+            title={`${label} group`}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px 0', fontSize: 9,
+              borderRadius: 3, border: `1px solid ${transformMode === id ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+              background: transformMode === id ? 'var(--accent-blue-dim)' : 'transparent',
+              color: transformMode === id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+            }}
+          >
+            <Icon size={11} /> {label}
+          </button>
+        ))}
+      </div>
+      <Vec3Row label="Position" values={t.position} onChange={(v) => setAssetTransform(group.id, { position: v })} />
+      <Vec3Row label="Rotation" unit="°" values={rotDeg} onChange={(v) => setAssetTransform(group.id, { rotation: [v[0] / DEG, v[1] / DEG, v[2] / DEG] })} />
+      <Vec3Row label="Scale" values={t.scaling} onChange={(v) => setAssetTransform(group.id, { scaling: v })} />
     </div>
   );
 }

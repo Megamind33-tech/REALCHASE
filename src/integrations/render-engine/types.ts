@@ -23,6 +23,24 @@ export interface ImportedAsset {
   /** True when the asset exceeds a soft performance budget. */
   heavy: boolean;
   heavyReason?: string;
+  /** Whether the geometry will be embedded in the project (vs referenced). */
+  embedded: boolean;
+  /** Operator opted this asset into external-reference mode. */
+  referenceMode: boolean;
+  /** Path/URL used to resolve an external (non-embedded) asset on reload. */
+  referencePath: string;
+  /** The external file could not be found on reload — kept as a stub. */
+  missing: boolean;
+  /** Group this asset belongs to, or null when ungrouped. */
+  groupId: string | null;
+}
+
+/** A named group of imported assets (a transformable parent). */
+export interface AssetGroup {
+  id: string;
+  name: string;
+  transform: AssetTransform;
+  childIds: string[];
 }
 
 /** Asset as written into / read from a CHASE project file. */
@@ -31,12 +49,38 @@ export interface SerializedAsset {
   name: string;
   format: AssetFormat;
   fileBytes: number;
+  meshCount: number;
+  vertexCount: number;
   transform: AssetTransform;
   /** Base64 of the original GLB bytes when embedded, else null. */
   data: string | null;
-  /** Whether the geometry is embedded (small enough) or needs re-import. */
+  /** Whether the geometry is embedded (small enough) or referenced/missing. */
   embedded: boolean;
+  referenceMode: boolean;
+  referencePath: string;
+  missing: boolean;
+  groupId: string | null;
 }
+
+export interface SerializedGroup {
+  id: string;
+  name: string;
+  transform: AssetTransform;
+  childIds: string[];
+}
+
+/** The full imported-scene layer of a project file. */
+export interface SceneSnapshot {
+  assets: SerializedAsset[];
+  groups: SerializedGroup[];
+}
+
+/**
+ * Resolves the bytes of an external (referenced) asset on reload. Returns null
+ * when the file can't be found, so the engine can show an honest missing state.
+ * In the desktop app this reads the filesystem; in the browser it fetches a URL.
+ */
+export type ExternalResolver = (referencePath: string) => Promise<Uint8Array | null>;
 
 export type AssetFailureKind = 'unsupported' | 'empty' | 'too-large' | 'corrupt';
 
