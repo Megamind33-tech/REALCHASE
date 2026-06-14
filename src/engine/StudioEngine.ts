@@ -78,6 +78,9 @@ function registerMediaShader() {
     'uniform sampler2D bgTexture;', // rendered backdrop (scene minus this plane)
     'uniform float lightWrap;',  // backdrop bleed into subject edges (0 = off)
     'uniform vec4 garbage;',     // garbage matte rect (minX,minY,maxX,maxY); default 0,0,1,1
+    'uniform vec3 matchTint;',   // lighting/colour-match tint (default white = no-op)
+    'uniform float matchExposure;', // exposure multiplier for colour match
+    'uniform float matchAmount;',   // 0 = off
     'uniform float opacity;',
     'uniform int showMatte;',    // 1 => render the alpha matte for calibration
     'varying vec2 vScreen;',     // this fragment's screen position (for backdrop sampling)
@@ -120,6 +123,12 @@ function registerMediaShader() {
     '    if (lightWrap > 0.001) {',
     '      vec3 bg = texture2D(bgTexture, vec2(vScreen.x, 1.0 - vScreen.y)).rgb;',
     '      rgb = mix(rgb, bg, clamp(lightWrap * (1.0 - alpha), 0.0, 1.0));',
+    '    }',
+    // Lighting/colour match: grade the keyed subject toward the set exposure+tint
+    // so it sits in the scene instead of looking pasted on. Gated → off = no-op.
+    '    if (matchAmount > 0.001) {',
+    '      vec3 graded = clamp(rgb * matchTint * matchExposure, 0.0, 1.0);',
+    '      rgb = mix(rgb, graded, matchAmount);',
     '    }',
     '  } else if (keyMode == 2) {',
     '    alpha = c.a;',
@@ -706,7 +715,7 @@ export class StudioEngine {
         'programMediaMat',
         this.scene,
         { vertex: MEDIA_SHADER, fragment: MEDIA_SHADER },
-        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'lightWrap', 'garbage', 'opacity', 'showMatte'], samplers: ['videoSampler', 'bgTexture'], needAlphaBlending: true },
+        { attributes: ['position', 'uv'], uniforms: ['worldViewProjection', 'keyMode', 'keyColor', 'similarity', 'smoothness', 'spill', 'denoise', 'blackClip', 'whiteClip', 'texel', 'lightWrap', 'garbage', 'matchTint', 'matchExposure', 'matchAmount', 'opacity', 'showMatte'], samplers: ['videoSampler', 'bgTexture'], needAlphaBlending: true },
       );
       mat.backFaceCulling = false;
       plane.material = mat;
@@ -728,6 +737,9 @@ export class StudioEngine {
       mat.setVector2('texel', new Vector2(1 / 1280, 1 / 720));
       mat.setFloat('lightWrap', 0);
       mat.setVector4('garbage', new Vector4(0, 0, 1, 1));
+      mat.setVector3('matchTint', new Vector3(1, 1, 1));
+      mat.setFloat('matchExposure', 1);
+      mat.setFloat('matchAmount', 0);
       if (!this.dummyBgTexture) {
         this.dummyBgTexture = RawTexture.CreateRGBATexture(new Uint8Array([0, 0, 0, 255]), 1, 1, this.scene, false, false, Texture.NEAREST_SAMPLINGMODE);
       }
@@ -819,6 +831,10 @@ export class StudioEngine {
     const wrap = mode === 'chromaKey' ? (keying.lightWrap ?? 0) : 0;
     mat.setFloat('lightWrap', wrap);
     mat.setVector4('garbage', new Vector4(keying.garbageLeft ?? 0, keying.garbageTop ?? 0, keying.garbageRight ?? 1, keying.garbageBottom ?? 1));
+    const mc = Color3.FromHexString(keying.matchColor || '#ffffff');
+    mat.setVector3('matchTint', new Vector3(mc.r, mc.g, mc.b));
+    mat.setFloat('matchExposure', keying.matchExposure ?? 1);
+    mat.setFloat('matchAmount', mode === 'chromaKey' ? (keying.matchAmount ?? 0) : 0);
     this.updateBackdropRtt(wrap > 0.001, mat);
     mat.setFloat('opacity', keying.opacity);
     mat.setInt('showMatte', keying.showMatte ? 1 : 0);

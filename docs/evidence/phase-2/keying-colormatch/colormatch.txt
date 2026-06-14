@@ -1,0 +1,9 @@
+off: matchAmount 0 (neutral). on: set light #ff7a33, amount 1.0, exposure 1.25 -> subject graded warm
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:08:41]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:08:48]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:08:54]: Babylon.js v9.9.1 - WebGL2
