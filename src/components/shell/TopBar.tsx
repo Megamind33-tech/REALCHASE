@@ -1,17 +1,29 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
-  Save, FolderOpen, FilePlus, Upload, Undo2, Redo2, Circle,
+  Save, FolderOpen, FilePlus, Upload, Undo2, Redo2, Circle, Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { buildProjectFile, parseProjectFile, saveProjectFile } from '@/projectPersistence';
 
+const DEFAULT_INGEST_URL = 'http://localhost:8889/chase/whip';
+
 export function TopBar() {
   const { state, dispatch } = useShell();
-  const { sources, previewId, programId, restoreProjectSources, capturing, canRecord, recordLabel, toggleCapture } = useSources();
+  const {
+    sources, previewId, programId, restoreProjectSources,
+    capturing, canRecord, recordLabel, toggleCapture,
+    onAir, canStream, liveLabel, streamError, toggleAir,
+  } = useSources();
   const openRef = useRef<HTMLInputElement>(null);
+  const [ingestUrl, setIngestUrl] = useState(DEFAULT_INGEST_URL);
   const { metrics } = state;
+
+  // Surface publish failures honestly instead of pretending we went on air.
+  useEffect(() => {
+    if (streamError) dispatch({ type: 'SHOW_TOAST', message: `Output failed: ${streamError}` });
+  }, [streamError, dispatch]);
 
   const saveProject = async () => {
     try {
@@ -115,8 +127,26 @@ export function TopBar() {
           <Circle size={10} fill="var(--status-rec)" className={capturing ? 'rec-pulse' : ''} />
           {recordLabel}
         </Button>
-        <Button data-testid="live-status" variant="secondary" disabled title="Live output not wired yet">
-          GO LIVE · Requires streaming engine
+        <input
+          type="url"
+          value={ingestUrl}
+          onChange={(e) => setIngestUrl(e.currentTarget.value)}
+          disabled={onAir}
+          placeholder="WHIP endpoint URL"
+          aria-label="WHIP endpoint URL"
+          spellCheck={false}
+          style={{ width: 210, fontSize: 11, padding: '4px 8px' }}
+        />
+        <Button
+          data-testid="live-status"
+          variant={onAir ? 'danger' : 'secondary'}
+          disabled={!canStream && !onAir}
+          onClick={() => toggleAir(ingestUrl)}
+          aria-pressed={onAir}
+          title={canStream || onAir ? 'Publish the Program output to a WHIP ingest server' : 'Put a source on Program to publish'}
+        >
+          <Radio size={12} className={onAir ? 'rec-pulse' : ''} />
+          {liveLabel}
         </Button>
       </div>
     </header>

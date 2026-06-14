@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useEditorBridge } from './EditorBridgeContext';
+import { whipPublish, type WhipSession } from '@/streaming/whip';
 import {
   DEFAULT_KEYING_SETTINGS,
   describeMediaError,
@@ -80,6 +81,12 @@ interface SourcesValue {
   canRecord: boolean;
   recordLabel: string;
   toggleCapture: () => void;
+  // Output (real WebRTC/WHIP publish of the Program output to an ingest server).
+  onAir: boolean;
+  canStream: boolean;
+  liveLabel: string;
+  streamError: string | null;
+  toggleAir: (url: string) => void;
 }
 
 function pickRecorderMime(): string {
@@ -276,6 +283,64 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
   const recordLabel = recording ? `● REC ${fmtTime(recElapsed)}` : 'REC';
 
+  // --- Real output: WebRTC/WHIP publish of the Program output to an ingest server ---
+  const [onAir, setOnAir] = useState(false);
+  const [airElapsed, setAirElapsed] = useState(0);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const airRef = useRef<{ session: WhipSession; timer: number; canvasStream: MediaStream | null } | null>(null);
+  const canStream = Boolean(programSource?.stream) && typeof RTCPeerConnection !== 'undefined';
+
+  const stopAir = useCallback(async () => {
+    const a = airRef.current;
+    if (!a) return;
+    airRef.current = null;
+    clearInterval(a.timer);
+    a.canvasStream?.getTracks().forEach((t) => t.stop());
+    setOnAir(false);
+    setAirElapsed(0);
+    try { await a.session.close(); } catch { /* server may already have reaped the session */ }
+  }, []);
+
+  const startAir = useCallback(async (url: string) => {
+    const program = sourcesRef.current.find((s) => s.id === state.programId);
+    if (!program?.stream || typeof RTCPeerConnection === 'undefined') return;
+    if (!url.trim()) { setStreamError('Enter a WHIP endpoint URL first.'); return; }
+    // Publish the composited studio output (canvas) when available, else the raw
+    // Program video track, plus the Program audio.
+    const canvasStream = captureOutputStream(30);
+    const videoTracks = canvasStream?.getVideoTracks().length ? canvasStream.getVideoTracks() : program.stream.getVideoTracks();
+    const out = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
+    let session: WhipSession;
+    try {
+      session = await whipPublish(url.trim(), out);
+    } catch (err) {
+      canvasStream?.getTracks().forEach((t) => t.stop());
+      setStreamError(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    // If the negotiated transport drops, tear the publish down so the UI reflects
+    // reality instead of a stale "on air".
+    session.pc.addEventListener('connectionstatechange', () => {
+      const st = session.pc.connectionState;
+      if (st === 'failed' || st === 'disconnected' || st === 'closed') void stopAir();
+    });
+    const started = Date.now();
+    const timer = window.setInterval(() => setAirElapsed(Date.now() - started), 500);
+    airRef.current = { session, timer, canvasStream };
+    setStreamError(null);
+    setOnAir(true);
+    setAirElapsed(0);
+  }, [captureOutputStream, state.programId, stopAir]);
+
+  const toggleAir = useCallback((url: string) => {
+    if (onAir) void stopAir(); else void startAir(url);
+  }, [onAir, startAir, stopAir]);
+
+  // Tear the publish down on unmount (no zombie PeerConnection / interval).
+  useEffect(() => () => { void stopAir(); }, [stopAir]);
+
+  const liveLabel = onAir ? `● ON AIR ${fmtTime(airElapsed)}` : 'GO LIVE';
+
   const value: SourcesValue = {
     sources: state.sources,
     previewId: state.previewId,
@@ -294,6 +359,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     canRecord,
     recordLabel,
     toggleCapture: toggleRecording,
+    onAir,
+    canStream,
+    liveLabel,
+    streamError,
+    toggleAir,
   };
 
   return <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>;

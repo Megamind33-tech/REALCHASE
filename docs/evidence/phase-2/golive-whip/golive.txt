@@ -1,0 +1,24 @@
+GO LIVE button disabled before a Program source? (null = enabled): null
+button label before: GO LIVE
+button label while on air: ● ON AIR 0:02
+button aria-pressed while on air: true (page eval: true)
+button label after stop: GO LIVE
+
+--- MediaMTX server-side proof (WHIP ingest) ---
+WHIP endpoint: http://localhost:8889/chase/whip
+paths before publish: []
+path "chase" publishing during: true
+  ready: true
+  source type: webRTCSession
+  tracks: ["Opus","VP8"]
+  bytesReceived: 12987
+path "chase" still publishing after stop: false
+
+-> A real browser published the Program output to MediaMTX over WHIP/WebRTC; the server confirmed an active WebRTC publisher with media tracks.
+
+--- page console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [03:12:19]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [03:12:25]: Babylon.js v9.9.1 - WebGL2
