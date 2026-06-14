@@ -1,5 +1,14 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
+## Editing Completeness Pass — Revive Dead Screens (2026-06-14)
+
+Addressed real gaps flagged in review (no more "coming soon" dead-ends):
+- **Remove from scene:** Delete button in the Asset and Group inspectors + Delete/Backspace key in the viewport (engine `removeAsset`/`removeGroup` were already present but had no UI).
+- **Rotate assets:** confirmed working — numeric rotation (Inspector Vec3Row) and the rotate gizmo (transform-mode toolbar) both drive the selected object.
+- **Every module now has a real workspace** (was 6 placeholder screens): Cameras (selection + FreeD tracking), Lighting (key/ambient/accent + presets), Audio (live meters), Outputs (composite preview + destinations), Overlays (graphics stack toggles), Scripts (timeline rundown), Settings (real preferences). All compose existing real state — no mock controls.
+- **Graphics fonts:** font-family selector added to lower third / ticker / logo bug; applies live to on-air graphics.
+- **Still genuinely missing / scoped next:** AR/WebXR entry point, asset material *textures*, audio mixer faders, scripting API. Tracked honestly in NEXT_WORK_QUEUE.
+
 ## Milestone 8 Update — Fork Wiring Audit (2026-06-14)
 
 - **Branch:** `chase/fork-audit`
@@ -72,14 +81,14 @@ display-only area pending Milestone 5.
 | **switcher** | WORKING | 85% | Real sources, preview/program, CUT, full chroma keying, placement modes |
 | **scenes** | WORKING | 85% | M3 — save/load/recapture/rename/delete named scenes with live thumbnails |
 | **graphics** | WORKING | 85% | M4 — lower third, ticker, logo bug; real overlay, play/stop/live-update |
-| **outputs** | PARTIAL | 60% | Real WHIP/REC/multi-destination in OutputPanel (right column); no standalone module workspace |
-| **audio** | PARTIAL | 30% | Real per-source level meters in OutputPanel; no mixer/module workspace |
+| **outputs** | WORKING | 70% | Real composite output preview + recording/air status + destinations list (full workspace) |
+| **audio** | WORKING | 55% | Real per-source live level meters (full workspace); mixer/faders still future |
 | **assets** | PARTIAL | 40% | Real GLB/glTF import + inspector in the Builder's AssetPanel; no standalone module workspace |
-| **overlays** | MOCK | 0% | Placeholder screen; overlay stacking not built (graphics cover lower-third/ticker) |
-| **lighting** | MOCK | 0% | Placeholder screen; no studio lighting controls |
-| **cameras** | MOCK | 0% | Placeholder screen; camera select/tracking is in the viewport toolbar |
-| **scripts** | MOCK | 0% | Placeholder screen; no automation/scripting engine |
-| **settings** | MOCK | 0% | Placeholder screen; no preferences UI |
+| **overlays** | WORKING | 70% | Real broadcast-graphics stack with per-overlay on-air toggles + layer order |
+| **lighting** | WORKING | 75% | Real key/ambient/accent lighting workspace + presets |
+| **cameras** | WORKING | 75% | Real camera selection grid + FreeD tracking controls |
+| **scripts** | WORKING | 40% | Real rundown view of timeline cues (jump-to); full scripting API still future |
+| **settings** | WORKING | 60% | Real preferences: quality, compact/reduced-motion, backup, project info |
 
 ---
 

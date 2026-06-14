@@ -5,7 +5,7 @@ import { useShell } from '@/context/ShellContext';
 import { useGraphics } from '@/context/GraphicsContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import {
-  defaultGraphic, graphicLabel, type Corner, type GraphicItem, type GraphicType,
+  defaultGraphic, graphicLabel, GRAPHIC_FONTS, type Corner, type GraphicItem, type GraphicType,
 } from '@/graphics/graphicsTypes';
 
 const TYPE_META: Record<GraphicType, { label: string; icon: typeof Type; hint: string }> = {
@@ -80,6 +80,19 @@ function Editor({ item, onPatch, onLiveUpdate }: { item: GraphicItem; onPatch: (
           </Field>
         </>
       )}
+
+      <Field label="Font">
+        <select
+          style={{ ...inputStyle, fontFamily: item.fontFamily }}
+          value={item.fontFamily}
+          onChange={(e) => patch({ fontFamily: e.currentTarget.value })}
+          aria-label="Font family"
+        >
+          {GRAPHIC_FONTS.map((f) => (
+            <option key={f} value={f} style={{ fontFamily: f }}>{f.split(',')[0]}</option>
+          ))}
+        </select>
+      </Field>
 
       <div style={{ display: 'flex', gap: 8 }}>
         <Field label="Accent color">

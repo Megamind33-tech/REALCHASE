@@ -11,11 +11,11 @@ import { GraphicsSync } from './GraphicsSync';
 import { TimelinePlayer } from './TimelinePlayer';
 import { useShell } from '@/context/ShellContext';
 
-const FULL_SURFACE_MODULES = new Set(['switcher', 'settings', 'scenes', 'graphics']);
-
 export function AppShell() {
   const { state } = useShell();
-  const showRightColumn = !FULL_SURFACE_MODULES.has(state.activeModule);
+  // The Inspector + Output right column is Builder-centric; every other module
+  // now has its own full-surface workspace.
+  const showRightColumn = state.activeModule === 'builder';
 
   return (
     <div

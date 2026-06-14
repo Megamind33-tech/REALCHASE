@@ -158,6 +158,15 @@ export class BroadcastGraphics {
         this.buildLogoBug(lg);
         break;
     }
+    this.applyFont(lg);
+  }
+
+  /** Apply the item's font family to every text block in the graphic. */
+  private applyFont(lg: LiveGraphic) {
+    const family = lg.item.fontFamily || 'Inter, sans-serif';
+    lg.root.getDescendants(false).forEach((c) => {
+      if (c instanceof TextBlock) c.fontFamily = family;
+    });
   }
 
   private buildLowerThird(lg: LiveGraphic) {
@@ -293,6 +302,7 @@ export class BroadcastGraphics {
       if (text) text.text = item.logoText ?? '';
       if (badge) badge.color = item.accentColor;
     }
+    this.applyFont(lg);
   }
 
   /** Drive position/opacity each frame from the animation state. */

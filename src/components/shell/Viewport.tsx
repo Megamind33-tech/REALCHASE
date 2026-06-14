@@ -10,6 +10,10 @@ import { ViewportCanvas } from '@/components/viewport/ViewportCanvas';
 import { SwitcherPanel } from '@/components/shell/SwitcherPanel';
 import { ScenesPanel } from '@/components/shell/ScenesPanel';
 import { GraphicsPanel } from '@/components/shell/GraphicsPanel';
+import {
+  CamerasWorkspace, LightingWorkspace, AudioWorkspace, OutputsWorkspace,
+  OverlaysWorkspace, ScriptsWorkspace, SettingsWorkspace,
+} from '@/components/shell/ModuleWorkspaces';
 import type { QualityMode, TransformMode } from '@/context/shellTypes';
 
 const QUALITY_MODES: QualityMode[] = ['low', 'balanced', 'high'];
@@ -38,6 +42,14 @@ export function Viewport() {
   if (state.activeModule === 'graphics') {
     return <GraphicsPanel />;
   }
+
+  if (state.activeModule === 'cameras') return <CamerasWorkspace />;
+  if (state.activeModule === 'lighting') return <LightingWorkspace />;
+  if (state.activeModule === 'audio') return <AudioWorkspace />;
+  if (state.activeModule === 'outputs') return <OutputsWorkspace />;
+  if (state.activeModule === 'overlays') return <OverlaysWorkspace />;
+  if (state.activeModule === 'scripts') return <ScriptsWorkspace />;
+  if (state.activeModule === 'settings') return <SettingsWorkspace />;
 
   if (state.activeModule !== 'builder') {
     return (

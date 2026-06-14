@@ -11,12 +11,24 @@ export type Corner = 'tl' | 'tr' | 'bl' | 'br';
 /** Live animation state of an on-air graphic (CasparCG: stopped/playing). */
 export type GraphicPlayState = 'idle' | 'in' | 'on' | 'out';
 
+export const GRAPHIC_FONTS = [
+  'Inter, sans-serif',
+  'Arial, Helvetica, sans-serif',
+  'Georgia, serif',
+  'JetBrains Mono, monospace',
+  'Impact, sans-serif',
+] as const;
+
+export const DEFAULT_GRAPHIC_FONT = GRAPHIC_FONTS[0];
+
 export interface GraphicItem {
   id: string;
   type: GraphicType;
   /** Higher layers render on top (CasparCG CG layer concept). */
   layer: number;
   accentColor: string;
+  /** Font family used for all text in this graphic. */
+  fontFamily: string;
   /** In/out animation length in seconds. */
   animDuration: number;
 
@@ -44,6 +56,7 @@ export function defaultGraphic(type: GraphicType, layer: number): GraphicItem {
     type,
     layer,
     accentColor: '#1a73e8',
+    fontFamily: DEFAULT_GRAPHIC_FONT,
     animDuration: 0.6,
   };
   switch (type) {

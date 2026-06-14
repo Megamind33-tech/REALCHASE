@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import {
-  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw,
+  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw, Trash2,
 } from 'lucide-react';
 import { Tabs, Slider, Toggle } from '@/components/ui/Controls';
 import { useShell } from '@/context/ShellContext';
@@ -282,7 +282,8 @@ const TRANSFORM_TOOLS: { id: TransformMode; icon: typeof Move; label: string }[]
 function AssetInspector({ asset, transformMode, onTransformMode }: {
   asset: ImportedAsset; transformMode: TransformMode; onTransformMode: (mode: TransformMode) => void;
 }) {
-  const { setAssetTransform, setAssetReferenceMode, setAssetReferencePath, relinkAsset } = useEditorBridge();
+  const { setAssetTransform, setAssetReferenceMode, setAssetReferencePath, relinkAsset, removeAsset } = useEditorBridge();
+  const { dispatch } = useShell();
   const relinkRef = useRef<HTMLInputElement>(null);
   const t = asset.transform;
   const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
@@ -294,6 +295,15 @@ function AssetInspector({ asset, transformMode, onTransformMode }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <Box size={13} style={{ color: 'var(--accent-blue)' }} />
         <span style={{ flex: 1, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={asset.name}>{asset.name}</span>
+        <button
+          onClick={() => { removeAsset(asset.id); dispatch({ type: 'SHOW_TOAST', message: `Removed ${asset.name}` }); }}
+          data-testid="delete-asset-button"
+          title="Remove from scene"
+          aria-label={`Remove ${asset.name} from scene`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 3, border: '1px solid var(--status-error)', background: 'transparent', color: 'var(--status-error)' }}
+        >
+          <Trash2 size={12} />
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px', fontSize: 9, color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -380,7 +390,8 @@ function GroupInspector({ group, transformMode, onTransformMode }: {
 }) {
   // Groups are transformed via the same engine path as assets (the group is a
   // real transform node); moving it preserves every child's local transform.
-  const { setAssetTransform } = useEditorBridge();
+  const { setAssetTransform, removeGroup } = useEditorBridge();
+  const { dispatch } = useShell();
   const t = group.transform;
   const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
   return (
@@ -392,6 +403,14 @@ function GroupInspector({ group, transformMode, onTransformMode }: {
         <Folder size={13} style={{ color: 'var(--accent-blue)' }} />
         <span style={{ flex: 1, fontSize: 11, fontWeight: 600 }} title={group.name}>{group.name}</span>
         <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{group.childIds.length} asset{group.childIds.length === 1 ? '' : 's'}</span>
+        <button
+          onClick={() => { removeGroup(group.id); dispatch({ type: 'SHOW_TOAST', message: `Removed group ${group.name}` }); }}
+          title="Remove group"
+          aria-label={`Remove group ${group.name}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 3, border: '1px solid var(--status-error)', background: 'transparent', color: 'var(--status-error)' }}
+        >
+          <Trash2 size={12} />
+        </button>
       </div>
       <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
         {TRANSFORM_TOOLS.map(({ id, icon: Icon, label }) => (

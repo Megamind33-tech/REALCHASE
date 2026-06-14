@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { useEditorBridge } from '@/context/EditorBridgeContext';
+import { useEditorBridge, useImportedAssets, useAssetGroups } from '@/context/EditorBridgeContext';
 import { useShell } from '@/context/ShellContext';
 
 export function ViewportCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { initCanvas, setActive, importGltfFiles } = useEditorBridge();
+  const { initCanvas, setActive, importGltfFiles, removeAsset, removeGroup } = useEditorBridge();
+  const assets = useImportedAssets();
+  const groups = useAssetGroups();
   const { state, dispatch } = useShell();
 
   useEffect(() => {
@@ -14,6 +16,23 @@ export function ViewportCanvas() {
     setActive(true); // resume rendering while the 3D viewport is on screen
     return () => setActive(false); // pause when leaving the Builder/viewport
   }, [initCanvas, setActive]);
+
+  // Delete / Backspace removes the selected imported asset or group from the
+  // scene (ignored while typing in a field so it never eats text edits).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      const id = state.selectedObjectId;
+      const asset = assets.find((a) => a.id === id);
+      const group = groups.find((g) => g.id === id);
+      if (asset) { removeAsset(asset.id); dispatch({ type: 'SHOW_TOAST', message: `Removed ${asset.name}` }); e.preventDefault(); }
+      else if (group) { removeGroup(group.id); dispatch({ type: 'SHOW_TOAST', message: `Removed group ${group.name}` }); e.preventDefault(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state.selectedObjectId, assets, groups, removeAsset, removeGroup, dispatch]);
 
   return (
     <div
