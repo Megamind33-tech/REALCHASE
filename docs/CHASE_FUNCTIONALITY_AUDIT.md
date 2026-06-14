@@ -72,30 +72,34 @@
 
 ### Timeline Panel
 
-**Status:** BROKEN (0% functional; display only)
+**Status:** WORKING (80%) — implemented in Milestone 5
+
+Real transport + cue engine (`TimelineContext` + always-mounted `TimelinePlayer`).
+The playhead advances in real time via requestAnimationFrame; cues fire concrete
+app actions — play/stop a broadcast graphic (M4) or switch the active camera.
 
 #### What Works
-- ✅ Timecode display (00:10:12:00 format)
-- ✅ Timeline height collapse/expand toggle
-- ✅ Layer list (reads from sceneNodes; correct names/colors)
-- ✅ Zoom control (50–200%) adjusts track width
-- ✅ Keyframe markers display (empty; no actual keyframes saved)
+- ✅ Broadcast timecode (HH:MM:SS:FF) advancing live from the playhead
+- ✅ Transport: play / pause / stop (to 0) / step ±1s / loop — all real
+- ✅ Scrubbable ruler — click or drag to seek; playhead reflects time
+- ✅ Cue authoring at the playhead: camera-cut cue, graphic-on / graphic-off cue
+- ✅ Cues fire automatically during playback AND on scrub (state reconciled to cues)
+- ✅ Cue markers on the ruler; cue list with jump-to and delete
+- ✅ Layer rail (scene nodes) with selection
+- ✅ Loop wraps and re-fires cues from the top
 
-#### What's Missing
-- ❌ Timeline transport: play, pause, skip buttons all disabled
-- ❌ Playback engine not connected (no frame stepping or timecode update)
-- ❌ Keyframe editing (UI renders; no click handlers)
-- ❌ Scrubbing (timeline position not draggable)
-- ❌ Keyframe recording (red record button disabled)
-- ❌ Loop control disabled
+#### What's Missing (future)
+- ⚠️ Per-object transform keyframing + interpolation (cues only, not tweens)
+- ⚠️ Timeline not yet persisted in the project file
+- ⚠️ Backward scrub reconciles graphics on/off but not mid-animation frames
 
 #### Acceptance Criteria for "Done"
-- [ ] Play button triggers playback; timecode advances in real-time
-- [ ] Pause/resume work; playback pauses at cursor position
-- [ ] Click on track to scrub; timecode updates on drag
-- [ ] Right-click on layer to set keyframe at current position
-- [ ] Shift+click to range-select keyframes; drag to move
-- [ ] Keyframes persist in project save/restore
+- [x] Play button triggers playback; timecode advances in real-time
+- [x] Pause/resume work; stop returns to start
+- [x] Click/drag on ruler to scrub; timecode updates
+- [x] Add cues at the playhead (camera + graphics)
+- [x] Cues drive real app state (graphics overlay + camera)
+- [ ] Transform keyframes + project persistence (future)
 
 ---
 

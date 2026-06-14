@@ -34,8 +34,8 @@ display-only area pending Milestone 5.
 - ✅ **Live Camera Thumbnails:** 6-camera round-robin live previews
 - ✅ **Scene Composer (M3):** Save/load/recapture named scenes with thumbnails
 - ✅ **Broadcast Graphics (M4):** Lower thirds, ticker, logo bug as real scene overlay
+- ✅ **Timeline (M5):** Real transport (play/pause/stop/step/loop), scrubbable playhead, cues that fire graphics + camera switches live
 - ⚠️ **Source input:** webcam only on this branch — video file / image / screen capture not yet ported (M2 backport outstanding)
-- ❌ **Timeline:** Display-only; transport/playback disabled (Milestone 5 target)
 - ⚠️ **Outputs/Audio/Assets modules:** real functionality lives in right-column panels, not standalone module workspaces
 - ❌ **Overlays / Lighting / Cameras / Scripts / Settings:** placeholder screens
 
@@ -45,7 +45,7 @@ display-only area pending Milestone 5.
 
 | Module | Status | Functional | Notes |
 |--------|--------|-----------|-------|
-| **builder** | WORKING | 80% | 3D viewport, asset import/transform, tracking, thumbnails all real; timeline area display-only |
+| **builder** | WORKING | 85% | 3D viewport, asset import/transform, tracking, thumbnails, real timeline transport + cues |
 | **switcher** | WORKING | 85% | Real sources, preview/program, CUT, full chroma keying, placement modes |
 | **scenes** | WORKING | 85% | M3 — save/load/recapture/rename/delete named scenes with live thumbnails |
 | **graphics** | WORKING | 85% | M4 — lower third, ticker, logo bug; real overlay, play/stop/live-update |
@@ -214,14 +214,14 @@ display-only area pending Milestone 5.
 ## Known Defects & Blockers
 
 ### Critical Issues
-1. **Timeline is display-only.** Transport buttons (play, pause, skip) are disabled. No actual playback engine exists. Keyframe editor is non-functional. *(Milestone 5 target.)*
-2. **Source input is webcam-only on this branch.** Video file / image / screen-capture inputs (built in M2 against an older base) were **not** ported onto the advanced `SourcesContext` and remain an outstanding backport.
+1. **Source input is webcam-only on this branch.** Video file / image / screen-capture inputs (built in M2 against an older base) were **not** ported onto the advanced `SourcesContext` and remain an outstanding backport.
 3. **Studio packs disabled.** AssetPanel expects `public/scenes/<pack-id>/scene.babylon` but no packaged scenes exist. Pack load is silently disabled to avoid fake success.
 4. **Output relay startup is manual.** Multi-destination RTMP fan-out is implemented (one ffmpeg process per leg, PR #22) but requires the local relay/MediaMTX to be running; no automatic relay startup or health/retry.
 
 ### Resolved since original draft
 - ~~No broadcast graphics system~~ → **Done (M4):** lower thirds, ticker, logo bug as a real Babylon GUI overlay with play/stop/live-update.
 - ~~No scene/layer composer~~ → **Done (M3):** named scene save/load with transforms + camera + desk + thumbnail.
+- ~~Timeline is display-only~~ → **Done (M5):** real transport + scrubbable playhead; cues fire broadcast graphics and camera switches live. (Transform keyframing remains future work.)
 
 ### Medium Issues
 6. **Video/image file input not implemented.** Only webcam sources work. Video/image file import on switcher would unlock single-file broadcast workflows.

@@ -8,6 +8,7 @@ import { Inspector, InspectorExpandHandle } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
 import { GraphicsSync } from './GraphicsSync';
+import { TimelinePlayer } from './TimelinePlayer';
 import { useShell } from '@/context/ShellContext';
 
 const FULL_SURFACE_MODULES = new Set(['switcher', 'settings', 'scenes', 'graphics']);
@@ -59,6 +60,7 @@ export function AppShell() {
 
       <StatusBar />
       <GraphicsSync />
+      <TimelinePlayer />
     </div>
   );
 }
