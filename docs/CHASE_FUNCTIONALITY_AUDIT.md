@@ -244,17 +244,18 @@
 - ✅ Keying controls (similarity, smoothness, spill, etc.) fully functional
 
 #### What's Missing
-- ❌ "Add Video File" button (not implemented)
-- ❌ "Add Image" button (not implemented)
-- ❌ "Add Screen Capture" button (not implemented)
+- ❌ "Add Video File" button (built in M2 on an older base; **not yet ported** to this branch's advanced SourcesContext — outstanding backport)
+- ❌ "Add Image" button (same — outstanding backport)
+- ❌ "Add Screen Capture" button (same — outstanding backport)
 - ❌ NDI/RTMP input (not implemented)
 - ⚠️ Placement mode "backgroundPlate" disabled (no composite output rendering yet)
 
 #### Acceptance Criteria for "Done"
-- [ ] Add webcam, video file, image, screen capture all work
-- [ ] Source health reflects actual track state
-- [ ] New sources appear in list within 500ms
-- [ ] Remove source stops playback and releases handles
+- [x] Add webcam works (real MediaStream)
+- [ ] Add video file / image / screen capture (backport from M2 outstanding)
+- [x] Source health reflects actual track state
+- [x] New sources appear in list immediately
+- [x] Remove source stops playback and releases handles
 
 ---
 
@@ -309,24 +310,30 @@
 
 ## MODULE: SCENES
 
-**Status:** MOCK (0%)
+**Status:** WORKING (85%) — implemented in Milestone 3
+
+Real scene composer (`ScenesPanel` + `ScenesContext`) backed by engine methods
+`captureNodeTransforms` / `applyNodeTransforms` / `captureSceneThumbnail` /
+`getActiveCameraId`.
 
 #### What Works
-- ❌ Placeholder text only
+- ✅ Save current scene (captures every selectable object's transform + active camera + desk look)
+- ✅ Live render-target thumbnail per scene
+- ✅ Load scene restores transforms + camera + desk; honest partial-restore (reports missing objects)
+- ✅ Scene grid with thumbnails, object count, camera tag
+- ✅ Rename (inline), re-capture, delete per scene
+- ✅ Active scene highlighting
 
-#### What's Missing
-- ❌ Scene browser
-- ❌ Scene create/rename/delete
-- ❌ Scene snapshot (save current asset/layout state)
-- ❌ Scene load (restore assets, cameras, lighting to saved state)
-- ❌ Scene thumbnail preview
+#### What's Missing (future polish)
+- ⚠️ Scenes not yet persisted in the project file (in-session only)
+- ⚠️ Lighting state not part of snapshot (lighting controls don't exist yet)
 
 #### Acceptance Criteria for "Done"
-- [ ] Create scene button; name dialog
-- [ ] Scene thumbnail generated from 3D viewport
-- [ ] Load scene restores all asset positions, groups, lighting
-- [ ] Scenes persist in project file
-- [ ] Quick-select scene from thumbnails grid
+- [x] Create scene button
+- [x] Scene thumbnail generated from 3D viewport
+- [x] Load scene restores object positions + camera + desk
+- [ ] Scenes persist in project file (future)
+- [x] Quick-select scene from thumbnails grid
 
 ---
 

@@ -2,25 +2,42 @@
 
 **Report Date:** June 14, 2026  
 **Current Build:** v0.1.0  
+**Branch:** `chase/fork-audit` (default, post PRs #16–#25 + Scenes/Graphics)  
 **Architecture:** React 19 + Babylon.js 9.9.1 + Tauri (desktop) / Vite (web)
+
+> **Reconciliation note (2026-06-14):** This report was originally drafted against
+> an older base. It is now reconciled to the **actual `chase/fork-audit` HEAD**,
+> which already merged 10 PRs (#16–#25): real WebRTC/WHIP publish, MediaRecorder
+> capture, multi-destination RTMP fan-out, GLB/glTF asset import, multi-asset scene
+> management + external references, camera tracking (FreeD), and live camera
+> thumbnails — plus the newly added Scene Composer and Broadcast Graphics.
 
 ## Executive Summary
 
-CHASE STUDIO PRO is a professional virtual broadcasting studio application. The codebase currently exists in a **hybrid state**: core systems (3D engine, media sources, output streaming) are partially wired and functional, but 11 of 12 modules present only placeholder screens or minimal mock implementations. The application requires substantial work to transform from a prototype UI into a fully functional professional broadcasting tool.
+CHASE STUDIO PRO is a professional virtual broadcasting studio application. Its
+core broadcast pipeline is **genuinely functional**: live sources → preview/program
+switching with real chroma keying → WebRTC/WHIP publish + multi-destination RTMP
+fan-out + .webm capture, on a stable Babylon 3D set with asset import and broadcast
+graphics. Four modules ship full real workspaces (Builder, Switcher, Scenes,
+Graphics). The remaining modules are either surfaced through the right-column panels
+(Outputs, Audio meters, Assets via the Builder) or are still placeholder screens
+(Overlays, Lighting, Cameras, Scripts, Settings). The Timeline is the main
+display-only area pending Milestone 5.
 
 ### Current Capability Snapshot
-- ✅ **3D Viewport:** Live Babylon.js rendering with multi-camera support and real asset import
-- ✅ **Media Sources:** Real webcam ingestion, live audio/video tracks, chroma-key controls
-- ✅ **Output Pipeline:** WebRTC/WHIP streaming to destinations, local capture to .webm
-- ✅ **Asset Management:** GLB/GLTF import, asset groups, transform controls, external file references
+- ✅ **3D Viewport:** Live Babylon rendering, 6 cameras, asset import, transforms, FreeD tracking
+- ✅ **Media Sources:** Real webcam ingestion, live tracks, full chroma-key calibration
+- ✅ **Switcher:** Preview/Program monitors, CUT, keying, placement modes — real
+- ✅ **Output Pipeline:** WebRTC/WHIP publish, multi-destination RTMP fan-out, .webm capture
+- ✅ **Asset Management:** GLB/GLTF import, groups, transforms, external references, relink
 - ✅ **Scene Persistence:** Project save/restore with asset state
-- ✅ **Live Camera Thumbnails:** 6-camera round-robin rendering with per-camera live previews
-- ⚠️ **Switcher Module:** Functional sources/preview/program but limited placement modes
-- ❌ **11 Other Modules:** Placeholder screens ("coming in next milestone")
-- ❌ **Timeline:** Display-only; transport/playback controls disabled
-- ❌ **Broadcast Graphics:** No lower thirds, tickers, name straps, or overlay system
-- ❌ **Scene/Layer Composer:** No scene save/load workflow
-- ❌ **Broadcasting Destinations:** RTMP leg routing wired but output relay incomplete
+- ✅ **Live Camera Thumbnails:** 6-camera round-robin live previews
+- ✅ **Scene Composer (M3):** Save/load/recapture named scenes with thumbnails
+- ✅ **Broadcast Graphics (M4):** Lower thirds, ticker, logo bug as real scene overlay
+- ⚠️ **Source input:** webcam only on this branch — video file / image / screen capture not yet ported (M2 backport outstanding)
+- ❌ **Timeline:** Display-only; transport/playback disabled (Milestone 5 target)
+- ⚠️ **Outputs/Audio/Assets modules:** real functionality lives in right-column panels, not standalone module workspaces
+- ❌ **Overlays / Lighting / Cameras / Scripts / Settings:** placeholder screens
 
 ---
 
@@ -28,18 +45,18 @@ CHASE STUDIO PRO is a professional virtual broadcasting studio application. The 
 
 | Module | Status | Functional | Notes |
 |--------|--------|-----------|-------|
-| **builder** | PARTIAL | 50% | 3D viewport works; asset import/transform works; timeline display-only |
-| **switcher** | WORKING | 85% | Sources, preview/program monitors work; limited placement modes |
-| **scenes** | MOCK | 0% | Placeholder screen only |
-| **assets** | MOCK | 0% | Placeholder screen; real import is in AssetPanel (builder) |
-| **graphics** | MOCK | 0% | Placeholder screen; no overlay/graphics system exists |
-| **overlays** | MOCK | 0% | Placeholder screen; no overlay stacking |
+| **builder** | WORKING | 80% | 3D viewport, asset import/transform, tracking, thumbnails all real; timeline area display-only |
+| **switcher** | WORKING | 85% | Real sources, preview/program, CUT, full chroma keying, placement modes |
+| **scenes** | WORKING | 85% | M3 — save/load/recapture/rename/delete named scenes with live thumbnails |
+| **graphics** | WORKING | 85% | M4 — lower third, ticker, logo bug; real overlay, play/stop/live-update |
+| **outputs** | PARTIAL | 60% | Real WHIP/REC/multi-destination in OutputPanel (right column); no standalone module workspace |
+| **audio** | PARTIAL | 30% | Real per-source level meters in OutputPanel; no mixer/module workspace |
+| **assets** | PARTIAL | 40% | Real GLB/glTF import + inspector in the Builder's AssetPanel; no standalone module workspace |
+| **overlays** | MOCK | 0% | Placeholder screen; overlay stacking not built (graphics cover lower-third/ticker) |
 | **lighting** | MOCK | 0% | Placeholder screen; no studio lighting controls |
-| **cameras** | MOCK | 0% | Placeholder screen; camera setup is in viewport toolbar |
-| **audio** | MOCK | 0% | Placeholder screen; audio meters exist in OutputPanel but no mixer |
+| **cameras** | MOCK | 0% | Placeholder screen; camera select/tracking is in the viewport toolbar |
 | **scripts** | MOCK | 0% | Placeholder screen; no automation/scripting engine |
-| **outputs** | MOCK | 0% | Placeholder screen; real output config is in OutputPanel |
-| **settings** | MOCK | 0% | Placeholder screen; no preferences/settings UI |
+| **settings** | MOCK | 0% | Placeholder screen; no preferences UI |
 
 ---
 
@@ -170,17 +187,20 @@ CHASE STUDIO PRO is a professional virtual broadcasting studio application. The 
 - Asset transform: ✅ WORKING
 - Asset groups: ✅ WORKING
 - Scene save/restore: ✅ WORKING
+- Scene composer (named scenes, M3): ✅ WORKING (save/load/recapture transforms + camera + desk + thumbnail)
 - Virtual set loading: ❌ MISSING (no pack system)
 - Layout presets: ❌ MISSING (UI buttons exist; not wired)
 
 ### Graphics & Overlays
-- Lower thirds (name straps): ❌ MISSING
-- Tickers/headlines: ❌ MISSING
-- Logo bug: ❌ MISSING
-- Broadcast watermark: ❌ MISSING
+- Lower thirds (name straps): ✅ WORKING (M4 — title/subtitle, animated in/out)
+- Tickers/headlines: ✅ WORKING (M4 — scrolling crawl, configurable speed)
+- Logo bug: ✅ WORKING (M4 — corner placement, opacity, fade)
+- Broadcast watermark: ✅ WORKING (logo bug serves this role)
+- Graphics render path: ✅ WORKING (Babylon GUI overlay on the live scene, in the rendered frame)
 - Safe area guides: ⚠️ PARTIAL (viewport button exists; toggle works; overlay not visible)
 - Chroma-key: ✅ WORKING (on sources; shader uniforms wired)
 - Keying UI: ✅ WORKING
+- Overlay stacking module: ❌ MISSING (Overlays module still placeholder)
 
 ### Broadcast Quality
 - Multi-camera support: ✅ WORKING (6 cams)
@@ -194,11 +214,14 @@ CHASE STUDIO PRO is a professional virtual broadcasting studio application. The 
 ## Known Defects & Blockers
 
 ### Critical Issues
-1. **Timeline is display-only.** Transport buttons (play, pause, skip) are disabled. No actual playback engine exists. Keyframe editor is non-functional.
-2. **No broadcast graphics system.** Lower thirds, tickers, and overlays are completely absent. Would require dedicated Babylon overlay layer + UI controls.
+1. **Timeline is display-only.** Transport buttons (play, pause, skip) are disabled. No actual playback engine exists. Keyframe editor is non-functional. *(Milestone 5 target.)*
+2. **Source input is webcam-only on this branch.** Video file / image / screen-capture inputs (built in M2 against an older base) were **not** ported onto the advanced `SourcesContext` and remain an outstanding backport.
 3. **Studio packs disabled.** AssetPanel expects `public/scenes/<pack-id>/scene.babylon` but no packaged scenes exist. Pack load is silently disabled to avoid fake success.
-4. **Output relay incomplete.** Destination RTMP legs are configured but the local ffmpeg fan-out process is manual; no automatic relay startup.
-5. **No scene/layer composer.** Scenes module is a placeholder. No workflow to save/load named scene configurations beyond full project persistence.
+4. **Output relay startup is manual.** Multi-destination RTMP fan-out is implemented (one ffmpeg process per leg, PR #22) but requires the local relay/MediaMTX to be running; no automatic relay startup or health/retry.
+
+### Resolved since original draft
+- ~~No broadcast graphics system~~ → **Done (M4):** lower thirds, ticker, logo bug as a real Babylon GUI overlay with play/stop/live-update.
+- ~~No scene/layer composer~~ → **Done (M3):** named scene save/load with transforms + camera + desk + thumbnail.
 
 ### Medium Issues
 6. **Video/image file input not implemented.** Only webcam sources work. Video/image file import on switcher would unlock single-file broadcast workflows.
