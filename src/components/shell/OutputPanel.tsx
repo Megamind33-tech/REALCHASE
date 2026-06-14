@@ -1,11 +1,47 @@
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { AudioMeter } from '@/components/audio/AudioMeter';
-import { TRANSITIONS, STREAM_DESTINATIONS } from '@/data/mock/studioData';
+import { TRANSITIONS } from '@/data/mock/studioData';
+import { legSummary, type StreamDestination, type LegKind } from '@/output/destinations';
+
+const legInput: React.CSSProperties = {
+  flex: 1, minWidth: 0, fontSize: 9, padding: '2px 5px',
+  background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)',
+  borderRadius: 2, color: 'var(--text-primary)',
+};
+
+function LegEditor({ dest, kind, label }: { dest: StreamDestination; kind: LegKind; label: string }) {
+  const { updateDestinationLeg } = useSources();
+  const leg = dest[kind];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+      <input
+        type="checkbox"
+        checked={leg.enabled}
+        aria-label={`${dest.name} ${label} enabled`}
+        onChange={(e) => updateDestinationLeg(dest.id, kind, { enabled: e.currentTarget.checked })}
+      />
+      <span style={{ width: 52, fontSize: 9, color: 'var(--text-secondary)' }}>{label}</span>
+      <input
+        style={legInput} spellCheck={false} placeholder="rtmp(s):// ingest URL"
+        aria-label={`${dest.name} ${label} URL`} value={leg.url}
+        onChange={(e) => updateDestinationLeg(dest.id, kind, { url: e.currentTarget.value })}
+      />
+      <input
+        style={{ ...legInput, flex: '0 0 96px' }} type="password" spellCheck={false} placeholder="stream key"
+        aria-label={`${dest.name} ${label} key`} value={leg.key}
+        onChange={(e) => updateDestinationLeg(dest.id, kind, { key: e.currentTarget.value })}
+      />
+    </div>
+  );
+}
 
 export function OutputPanel() {
   const { state } = useShell();
-  const { sources, onAir, liveLabel, capturing, recordLabel } = useSources();
+  const {
+    sources, onAir, liveLabel, capturing, recordLabel,
+    destinations, updateDestination, armedTargetCount, liveWebsite,
+  } = useSources();
   const liveAudioSources = sources.filter((s) => s.status === 'live' && s.stream && s.stream.getAudioTracks().length > 0);
   if (state.rightPanelCollapsed || state.activeModule === 'settings' || state.activeModule === 'switcher') return null;
 
@@ -109,25 +145,61 @@ export function OutputPanel() {
         </div>
 
         <div data-testid="stream-destination-panel">
-          <div className="section-label" style={{ marginBottom: 4 }}>Stream Destinations</div>
-          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 4 }}>
-            Output publishes to the WHIP endpoint set in the toolbar. Per-destination publishing not wired.
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span className="section-label">Stream Destinations</span>
+            <span style={{ fontSize: 9, color: 'var(--text-muted)' }} data-testid="armed-target-count">
+              {armedTargetCount} RTMP leg{armedTargetCount === 1 ? '' : 's'} armed
+            </span>
           </div>
-          {STREAM_DESTINATIONS.map((dest) => (
-          <div
-            key={dest.id}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 0',
-              fontSize: 10,
-              borderBottom: '1px solid var(--border-subtle)',
-            }}
-          >
-            <span style={{ color: 'var(--text-secondary)' }}>{dest.name}</span>
-            <span className="mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>Per-destination publishing not wired</span>
+          <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 6 }}>
+            Each station fans out via the local relay: a satellite uplink and a normal output. Keys stay in memory only.
           </div>
+
+          {destinations.map((dest) => (
+            <div
+              key={dest.id}
+              data-testid={`dest-${dest.platform}`}
+              style={{ padding: '5px 0', borderBottom: '1px solid var(--border-subtle)' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={dest.enabled}
+                  aria-label={`${dest.name} enabled`}
+                  onChange={(e) => updateDestination(dest.id, { enabled: e.currentTarget.checked })}
+                />
+                <span style={{ flex: 1, color: 'var(--text-secondary)', fontSize: 10 }}>{dest.name}</span>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--text-muted)' }}>{legSummary(dest)}</span>
+              </div>
+
+              {dest.enabled && dest.platform !== 'website' && (
+                <div style={{ paddingLeft: 22, marginTop: 2 }}>
+                  <LegEditor dest={dest} kind="satellite" label="Satellite" />
+                  <LegEditor dest={dest} kind="normal" label="Normal" />
+                </div>
+              )}
+
+              {dest.platform === 'website' && (
+                <div style={{ paddingLeft: 22, marginTop: 3, fontSize: 9, color: 'var(--text-muted)' }}>
+                  {onAir && liveWebsite ? (
+                    <>
+                      <div className="mono" style={{ wordBreak: 'break-all' }}>{liveWebsite.whepUrl}</div>
+                      <a
+                        href={`/live.html?src=${encodeURIComponent(liveWebsite.whepUrl)}`}
+                        target="_blank" rel="noreferrer"
+                        data-testid="live-website-link"
+                      >
+                        Open public page ↗
+                      </a>
+                    </>
+                  ) : (
+                    <a href="/live.html" target="_blank" rel="noreferrer" data-testid="live-website-link">
+                      Open public page ↗ (plays once on air)
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

@@ -1,0 +1,25 @@
+REAL multi-destination fan-out (local RTMP sinks stand in for YouTube/Twitch/Facebook ingests):
+armed-count label: 3 RTMP legs armed
+
+  sink yt-normal: ready=true src=rtmpConn tracks=["H264","MPEG-4 Audio"] bytesReceived=929435
+  sink tw-normal: ready=true src=rtmpConn tracks=["H264","MPEG-4 Audio"] bytesReceived=931881
+  sink fb-sat: ready=true src=rtmpConn tracks=["H264","MPEG-4 Audio"] bytesReceived=939353
+
+Public live website (/live.html, WHEP playback):
+  player state: LIVE
+  video frame: 306x162, non-black pixels: 35187
+
+paths still up after stop: []
+
+-> All three stations received forwarded media server-side; this is the exact mechanism that reaches YouTube/Twitch/Facebook (swap the local sink URL for the platform ingest + key).
+-> The public live website played a real, non-black program frame over WHEP.
+
+--- studio page console ---
+[log] BJS - [07:19:06]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [07:19:11]: Babylon.js v9.9.1 - WebGL2
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+[verbose] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
