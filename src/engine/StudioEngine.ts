@@ -1,34 +1,30 @@
-import {
-  AbstractMesh,
-  ArcRotateCamera,
-  Color3,
-  Color4,
-  Effect,
-  Engine,
-  FilesInputStore,
-  FreeCamera,
-  GizmoManager,
-  Mesh,
-  MeshBuilder,
-  ImportMeshAsync,
-  PBRMaterial,
-  type Observer,
-  PointerEventTypes,
-  RawTexture,
-  RenderTargetTexture,
-  Scene,
-  ShaderMaterial,
-  StandardMaterial,
-  Texture,
-  Tools,
-  TransformNode,
-  Vector2,
-  Vector3,
-  Vector4,
-  VideoTexture,
-} from '@babylonjs/core';
+import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera';
+import { FreeCamera } from '@babylonjs/core/Cameras/freeCamera';
+import { Engine } from '@babylonjs/core/Engines/engine';
+import { PointerEventTypes } from '@babylonjs/core/Events/pointerEvents';
+import { GizmoManager } from '@babylonjs/core/Gizmos/gizmoManager';
+import { ImportMeshAsync } from '@babylonjs/core/Loading/sceneLoader';
+import { Effect } from '@babylonjs/core/Materials/effect';
+import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
+import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial';
+import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
+import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTargetTexture';
+import { Texture } from '@babylonjs/core/Materials/Textures/texture';
+import { VideoTexture } from '@babylonjs/core/Materials/Textures/videoTexture';
+import { Color3, Color4 } from '@babylonjs/core/Maths/math.color';
+import { Vector2, Vector3, Vector4 } from '@babylonjs/core/Maths/math.vector';
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
+import { TransformNode } from '@babylonjs/core/Meshes/transformNode';
+import { FilesInputStore } from '@babylonjs/core/Misc/filesInputStore';
+import type { Observer } from '@babylonjs/core/Misc/observable';
+import { Tools } from '@babylonjs/core/Misc/tools';
+import '@babylonjs/core/Rendering/edgesRenderer';
+import { Scene } from '@babylonjs/core/scene';
 import '@babylonjs/loaders/glTF';
-import { loadScene, type SceneLoaderQualitySelector } from 'babylonjs-editor-tools';
+import { loadScene, type SceneLoaderQualitySelector } from 'babylonjs-editor-tools/loading/loader';
 import {
   applyCameraLens,
   applyDeskVisuals,

@@ -13,6 +13,9 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    watch: {
+      ignored: ['**/forks/**'],
+    },
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
@@ -39,6 +42,10 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@babylonjs/core', '@babylonjs/loaders', '@babylonjs/materials'],
+    entries: ['index.html'],
+    // Babylon is already native ESM and is imported through explicit subpaths.
+    // Prebundling the package barrels creates a multi-megabyte cache and stalls
+    // first launch on modest Windows/OneDrive workstations.
+    exclude: ['@babylonjs/core', '@babylonjs/loaders', '@babylonjs/materials'],
   },
 });
