@@ -15,6 +15,7 @@ interface EditorBridgeValue {
   engine: StudioEngine | null;
   initCanvas: (canvas: HTMLCanvasElement) => void;
   setActive: (active: boolean) => void;
+  setCameraTracking: (enabled: boolean) => void;
   sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
@@ -108,6 +109,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engineRef.current?.setActive(active);
   }, []);
 
+  const setCameraTracking = useCallback((enabled: boolean) => {
+    engineRef.current?.setCameraTracking(enabled);
+  }, []);
+
   const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
 
   const addObject = useCallback((objectId: string) => {
@@ -132,6 +137,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         engine,
         initCanvas,
         setActive,
+        setCameraTracking,
         sampleKeyColor,
         addObject,
         loadPack,

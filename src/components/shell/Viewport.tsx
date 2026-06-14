@@ -1,7 +1,8 @@
 import {
   Box, Move, RotateCw, Maximize2, Focus, Grid3x3, RectangleHorizontal,
-  AlertTriangle,
+  AlertTriangle, Crosshair,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Button, IconButton } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
@@ -19,7 +20,8 @@ const TRANSFORM_MODES: { id: TransformMode; icon: typeof Box; label: string }[] 
 
 export function Viewport() {
   const { state, dispatch } = useShell();
-  const { engine } = useEditorBridge();
+  const { engine, setCameraTracking } = useEditorBridge();
+  const [tracking, setTracking] = useState(false);
 
   if (state.activeModule === 'switcher') {
     return <SwitcherPanel />;
@@ -109,6 +111,13 @@ export function Viewport() {
           </IconButton>
           <IconButton label="Toggle grid (not wired yet)" disabled>
             <Grid3x3 size={14} />
+          </IconButton>
+          <IconButton
+            label="Camera tracking (test signal — drives the virtual camera)"
+            active={tracking}
+            onClick={() => { const next = !tracking; setTracking(next); setCameraTracking(next); }}
+          >
+            <Crosshair size={14} />
           </IconButton>
           <IconButton
             label="Safe area guides"
