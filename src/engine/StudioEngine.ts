@@ -11,6 +11,7 @@ import {
   Mesh,
   MeshBuilder,
   ImportMeshAsync,
+  type Observer,
   PointerEventTypes,
   RawTexture,
   RenderTargetTexture,
@@ -143,6 +144,9 @@ export class StudioEngine {
   private transformMode: TransformMode = 'select';
   private qualityMode: QualityMode = 'balanced';
   private orthoCamera: FreeCamera | null = null;
+  private trackedCamera: FreeCamera | null = null;
+  private trackingActive = false;
+  private trackingObserver: Observer<Scene> | null = null;
   private viewportMode: '3d' | '2d' = '3d';
   private deskProps: DeskProperties | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -443,8 +447,73 @@ export class StudioEngine {
     cam.setTarget(pos);
   }
 
+  /**
+   * Camera-tracking integration point. External tracking data (FreeD / mo-sys /
+   * NDI etc.) drives the virtual camera by calling this each frame; the set,
+   * keyed source, light-wrap and occlusion then stay locked to the move.
+   */
+  applyCameraPose(position: Vector3, target: Vector3, fov: number) {
+    if (!this.trackedCamera) return;
+    this.trackedCamera.position.copyFrom(position);
+    this.trackedCamera.setTarget(target);
+    this.trackedCamera.fov = fov;
+  }
+
+  /**
+   * Enable a tracked virtual camera. With no real tracking hardware attached we
+   * feed a clearly-labelled synthetic TEST SIGNAL (a gentle jib/handheld move) so
+   * the pipeline can be verified; real tracking data replaces it via
+   * applyCameraPose(). Disabling restores the selected studio camera.
+   */
+  setCameraTracking(enabled: boolean) {
+    if (!this.scene) return;
+    this.markInteraction();
+    if (enabled) {
+      if (!this.trackedCamera) {
+        this.trackedCamera = new FreeCamera('trackedCam', new Vector3(0, 1.6, -9), this.scene);
+        this.trackedCamera.minZ = 0.1;
+        this.trackedCamera.maxZ = 200;
+      }
+      this.cameras.get(this.activeCameraId)?.detachControl();
+      this.cameras.forEach((c) => c.setEnabled(false));
+      this.orthoCamera?.setEnabled(false);
+      this.trackedCamera.setEnabled(true);
+      this.scene.activeCamera = this.trackedCamera;
+      this.trackingActive = true;
+      if (!this.trackingObserver) {
+        this.trackingObserver = this.scene.onBeforeRenderObservable.add(() => {
+          if (!this.trackingActive) return;
+          // Synthetic tracking test signal (stand-in for FreeD/mo-sys/NDI input).
+          const t = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+          this.applyCameraPose(
+            new Vector3(Math.sin(t * 0.5) * 2.6, 1.6 + Math.sin(t * 0.37) * 0.4, -9 + Math.sin(t * 0.3) * 1.2),
+            new Vector3(0, 1.4, 2),
+            0.8 + Math.sin(t * 0.25) * 0.05,
+          );
+          this.markInteraction(); // tracked motion = full frame rate (not idle)
+        });
+      }
+    } else {
+      this.trackingActive = false;
+      if (this.trackingObserver) {
+        this.scene.onBeforeRenderObservable.remove(this.trackingObserver);
+        this.trackingObserver = null;
+      }
+      this.trackedCamera?.setEnabled(false);
+      this.setActiveCamera(this.activeCameraId);
+    }
+  }
+
   setActiveCamera(id: CameraId) {
     this.markInteraction();
+    if (this.trackingActive) {
+      this.trackingActive = false;
+      if (this.trackingObserver && this.scene) {
+        this.scene.onBeforeRenderObservable.remove(this.trackingObserver);
+        this.trackingObserver = null;
+      }
+      this.trackedCamera?.setEnabled(false);
+    }
     const next = this.cameras.get(id);
     if (!next || !this.scene) return;
     this.cameras.get(this.activeCameraId)?.detachControl();
@@ -899,6 +968,11 @@ export class StudioEngine {
       document.removeEventListener('visibilitychange', this.visibilityHandler);
       this.visibilityHandler = null;
     }
+    if (this.trackingObserver) {
+      this.scene?.onBeforeRenderObservable.remove(this.trackingObserver);
+      this.trackingObserver = null;
+    }
+    this.trackingActive = false;
     this.resizeObserver?.disconnect();
     this.gizmoManager?.dispose();
     this.scene?.dispose();

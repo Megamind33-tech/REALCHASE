@@ -1,0 +1,8 @@
+tracking test signal: synthetic jib move; source stays world-locked across poses A/B/C
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:01:31]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:01:38]: Babylon.js v9.9.1 - WebGL2
