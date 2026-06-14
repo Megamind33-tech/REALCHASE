@@ -1,0 +1,10 @@
+live camera thumbnails rendered: 6/6
+all are real data:image renders: true
+distinct thumbnail images (different camera views): 6/6
+approx thumbnail size: 20 KB each
+active-camera switch refreshes its thumbnail: true
+
+FPS samples while thumbnails refresh: [26,45,44,45,45,45]
+FPS min=26 avg=41.7 (render loop stayed live throughout)
+
+-> PASS: six real, distinct, live camera thumbnails; active switch refreshes; render loop stayed smooth; no crash.

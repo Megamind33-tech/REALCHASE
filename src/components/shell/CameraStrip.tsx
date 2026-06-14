@@ -1,14 +1,58 @@
+import { useEffect, useRef, useState } from 'react';
 import { Eye } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
+import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { CAMERA_SHOTS } from '@/data/mock/studioData';
+import type { CameraId } from '@/engine/sceneRegistry';
+
+// How often to refresh one thumbnail. Each tick renders the ACTIVE camera (so it
+// feels live) plus one other camera round-robin, so all six stay current within a
+// few seconds at a cost of ~1–2 tiny off-screen renders per second.
+const REFRESH_MS = 700;
 
 export function CameraStrip() {
   const { state, dispatch } = useShell();
+  const { captureCameraThumbnail } = useEditorBridge();
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const busy = useRef(false);
+  const rrIndex = useRef(0);
+  const activeId = state.activeCameraId;
 
-  if (state.activeModule !== 'builder') return null;
+  const show = state.activeModule === 'builder';
+
+  useEffect(() => {
+    if (!show || !state.engineReady) return;
+    let stopped = false;
+
+    const grab = async (id: string) => {
+      const url = await captureCameraThumbnail(id as CameraId, 192);
+      if (url && !stopped) setThumbs((prev) => (prev[id] === url ? prev : { ...prev, [id]: url }));
+    };
+
+    const tick = async () => {
+      if (busy.current || document.hidden) return;
+      busy.current = true;
+      try {
+        // Keep the live (active) camera fresh, then advance the round-robin.
+        await grab(activeId);
+        const next = CAMERA_SHOTS[rrIndex.current % CAMERA_SHOTS.length].id;
+        rrIndex.current += 1;
+        if (next !== activeId) await grab(next);
+      } finally {
+        busy.current = false;
+      }
+    };
+
+    void tick(); // populate immediately on entering the builder
+    const timer = window.setInterval(() => { void tick(); }, REFRESH_MS);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [show, state.engineReady, activeId, captureCameraThumbnail]);
+
+  if (!show) return null;
 
   return (
     <div
+      data-testid="camera-strip"
       style={{
         height: 'var(--camera-strip-h)',
         borderTop: '1px solid var(--border-subtle)',
@@ -23,20 +67,15 @@ export function CameraStrip() {
     >
       {CAMERA_SHOTS.map((cam) => {
         const active = state.activeCameraId === cam.id;
+        const thumb = thumbs[cam.id];
         return (
           <button
             key={cam.id}
             onClick={() => dispatch({ type: 'SET_CAMERA', id: cam.id })}
-            style={{
-              flexShrink: 0,
-              width: 96,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              background: 'transparent',
-            }}
+            style={{ flexShrink: 0, width: 96, display: 'flex', flexDirection: 'column', gap: 4, background: 'transparent' }}
           >
             <div
+              data-testid={`camera-thumb-${cam.id}`}
               style={{
                 aspectRatio: '16/9',
                 background: 'var(--bg-viewport)',
@@ -45,17 +84,34 @@ export function CameraStrip() {
                 position: 'relative',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 2,
-                color: active ? 'var(--status-ok)' : 'var(--text-muted)',
               }}
             >
-              {/* 3D viewport angle, not a live feed — no fake thumbnail preview. */}
-              <Eye size={16} />
-              <span style={{ fontSize: 8 }}>{cam.shortLabel}</span>
-              <span style={{ fontSize: 7 }}>Viewpoint</span>
+              {thumb ? (
+                <img
+                  src={thumb}
+                  alt={`${cam.label} view`}
+                  data-thumb="live"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, color: active ? 'var(--status-ok)' : 'var(--text-muted)' }}>
+                  <Eye size={16} />
+                  <span style={{ fontSize: 7 }}>Rendering…</span>
+                </div>
+              )}
+              <span
+                style={{
+                  position: 'absolute', left: 3, bottom: 3,
+                  fontSize: 7, fontWeight: 600, letterSpacing: '0.04em',
+                  padding: '1px 3px', borderRadius: 2,
+                  background: 'rgba(0,0,0,0.55)',
+                  color: active ? 'var(--status-ok)' : '#fff',
+                }}
+              >
+                {cam.shortLabel}
+              </span>
             </div>
             <span
               style={{
