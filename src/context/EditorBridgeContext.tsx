@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { StudioEngine } from '@/engine/StudioEngine';
+import { StudioEngine, type TrackingStatus } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import { useShell } from './ShellContext';
 
@@ -17,6 +17,11 @@ interface EditorBridgeValue {
   setActive: (active: boolean) => void;
   setCameraTracking: (enabled: boolean) => void;
   setTrackingSmoothing: (amount: number) => void;
+  connectTracking: (url: string) => void;
+  disconnectTracking: () => void;
+  trackingStatus: TrackingStatus | 'idle';
+  trackingLinked: boolean;
+  trackingLabel: string;
   sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
@@ -24,12 +29,21 @@ interface EditorBridgeValue {
   sceneNodes: SceneNodeInfo[];
 }
 
+const TRACKING_LABELS: Record<TrackingStatus | 'idle', string> = {
+  idle: 'Connect tracking',
+  connecting: 'Linking…',
+  connected: '● Tracking live',
+  disconnected: 'Connect tracking',
+  error: 'Retry connect',
+};
+
 const EditorBridgeContext = createContext<EditorBridgeValue | null>(null);
 
 export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const engineRef = useRef<StudioEngine | null>(null);
   const [engine, setEngine] = useState<StudioEngine | null>(null);
   const [sceneNodes, setSceneNodes] = useState<SceneNodeInfo[]>([]);
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | 'idle'>('idle');
   const { state, dispatch } = useShell();
 
   const initCanvas = useCallback((canvas: HTMLCanvasElement) => {
@@ -59,6 +73,9 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'scene-graph') {
         setSceneNodes(event.nodes);
+      }
+      if (event.type === 'tracking') {
+        setTrackingStatus(event.status);
       }
     });
     instance.init(canvas);
@@ -118,6 +135,14 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     engineRef.current?.setTrackingSmoothing(amount);
   }, []);
 
+  const connectTracking = useCallback((url: string) => {
+    engineRef.current?.connectTrackingSource(url);
+  }, []);
+
+  const disconnectTracking = useCallback(() => {
+    engineRef.current?.disconnectTrackingSource();
+  }, []);
+
   const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
 
   const addObject = useCallback((objectId: string) => {
@@ -144,6 +169,11 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         setActive,
         setCameraTracking,
         setTrackingSmoothing,
+        connectTracking,
+        disconnectTracking,
+        trackingStatus,
+        trackingLinked: trackingStatus === 'connected' || trackingStatus === 'connecting',
+        trackingLabel: TRACKING_LABELS[trackingStatus],
         sampleKeyColor,
         addObject,
         loadPack,
