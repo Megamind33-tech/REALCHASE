@@ -89,6 +89,7 @@ export function Slider({ label, value, min = 0, max = 100, unit = '', onChange }
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         style={{ width: '100%', accentColor: 'var(--accent-blue)' }}
+        aria-label={label}
       />
     </div>
   );

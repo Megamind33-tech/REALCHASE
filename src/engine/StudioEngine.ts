@@ -32,6 +32,7 @@ import {
   applyDeskVisuals,
   bindEngineResize,
   buildDefaultStudioScene,
+  focalLengthToFov,
 } from './defaultStudioScene';
 import { QUALITY_PROFILES } from './qualityProfile';
 import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sceneRegistry';
@@ -156,6 +157,8 @@ export class StudioEngine {
   private trackedCamera: FreeCamera | null = null;
   private trackingActive = false;
   private trackingObserver: Observer<Scene> | null = null;
+  private trackingSmoothing = 0.4;
+  private smoothTarget = new Vector3(0, 1.4, 2);
   private viewportMode: '3d' | '2d' = '3d';
   private deskProps: DeskProperties | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -463,9 +466,26 @@ export class StudioEngine {
    */
   applyCameraPose(position: Vector3, target: Vector3, fov: number) {
     if (!this.trackedCamera) return;
-    this.trackedCamera.position.copyFrom(position);
-    this.trackedCamera.setTarget(target);
-    this.trackedCamera.fov = fov;
+    const s = this.trackingSmoothing;
+    if (s > 0.001) {
+      // Low-pass the incoming pose to reject tracking jitter (real FreeD/mo-sys
+      // data is noisy). Higher smoothing = slower, steadier follow.
+      const k = 1 - s;
+      Vector3.LerpToRef(this.trackedCamera.position, position, k, this.trackedCamera.position);
+      Vector3.LerpToRef(this.smoothTarget, target, k, this.smoothTarget);
+      this.trackedCamera.setTarget(this.smoothTarget);
+      this.trackedCamera.fov += (fov - this.trackedCamera.fov) * k;
+    } else {
+      this.trackedCamera.position.copyFrom(position);
+      this.trackedCamera.setTarget(target);
+      this.smoothTarget.copyFrom(target);
+      this.trackedCamera.fov = fov;
+    }
+  }
+
+  /** Tracking pose smoothing 0..~0.97 (low-pass jitter rejection). */
+  setTrackingSmoothing(amount: number) {
+    this.trackingSmoothing = Math.min(0.97, Math.max(0, amount));
   }
 
   /**
@@ -492,12 +512,16 @@ export class StudioEngine {
       if (!this.trackingObserver) {
         this.trackingObserver = this.scene.onBeforeRenderObservable.add(() => {
           if (!this.trackingActive) return;
-          // Synthetic tracking test signal (stand-in for FreeD/mo-sys/NDI input).
+          // Synthetic tracking test signal (stand-in for FreeD/mo-sys/NDI input):
+          // a jib move plus small per-frame noise, like real (noisy) tracking data.
           const t = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+          const jitter = () => (Math.random() - 0.5) * 0.18;
+          // Lens match: virtual camera FOV follows the configured focal length.
+          const fov = this.deskProps ? focalLengthToFov(this.deskProps.focalLength) : 0.8;
           this.applyCameraPose(
-            new Vector3(Math.sin(t * 0.5) * 2.6, 1.6 + Math.sin(t * 0.37) * 0.4, -9 + Math.sin(t * 0.3) * 1.2),
-            new Vector3(0, 1.4, 2),
-            0.8 + Math.sin(t * 0.25) * 0.05,
+            new Vector3(Math.sin(t * 0.5) * 2.6 + jitter(), 1.6 + Math.sin(t * 0.37) * 0.4 + jitter(), -9 + Math.sin(t * 0.3) * 1.2 + jitter()),
+            new Vector3(jitter() * 0.3, 1.4 + jitter() * 0.2, 2),
+            fov,
           );
           this.markInteraction(); // tracked motion = full frame rate (not idle)
         });
