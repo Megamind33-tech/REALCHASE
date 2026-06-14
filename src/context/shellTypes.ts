@@ -8,6 +8,7 @@ export type ModuleId =
   | 'scenes'
   | 'assets'
   | 'graphics'
+  | 'ar'
   | 'overlays'
   | 'lighting'
   | 'cameras'

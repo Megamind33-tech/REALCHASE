@@ -9,6 +9,7 @@ import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
 import { GraphicsSync } from './GraphicsSync';
 import { TimelinePlayer } from './TimelinePlayer';
+import { ArSync } from './ArSync';
 import { useShell } from '@/context/ShellContext';
 
 export function AppShell() {
@@ -61,6 +62,7 @@ export function AppShell() {
       <StatusBar />
       <GraphicsSync />
       <TimelinePlayer />
+      <ArSync />
     </div>
   );
 }

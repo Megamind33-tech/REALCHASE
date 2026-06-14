@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, Crosshair, Volume2, Radio, SquareStack, Settings as SettingsIcon, ScrollText, Square, Sun } from 'lucide-react';
+import { Camera, Crosshair, Volume2, Radio, SquareStack, Settings as SettingsIcon, ScrollText, Square, Sun, Boxes, Trash2 } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { useGraphics } from '@/context/GraphicsContext';
 import { useTimeline } from '@/context/TimelineContext';
 import { useLighting } from '@/context/LightingContext';
+import { useAr } from '@/context/ArContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { Slider, Toggle } from '@/components/ui/Controls';
 import { CompositeOutputPreview } from '@/components/output/CompositeOutputPreview';
@@ -12,6 +13,7 @@ import { CAMERA_SHOTS } from '@/data/mock/studioData';
 import { LIGHTING_PRESETS, type LightChannel, type LightingSettings } from '@/engine/lighting';
 import { graphicLabel } from '@/graphics/graphicsTypes';
 import { formatClock } from '@/timeline/timelineTypes';
+import { defaultArElement, arKindLabel, type ArElementKind } from '@/ar/arTypes';
 import type { QualityMode } from '@/context/shellTypes';
 
 const surface: React.CSSProperties = { flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 20, overflowY: 'auto' };
@@ -340,6 +342,109 @@ export function ScriptsWorkspace() {
           )}
           <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 8 }}>Show length: {formatClock(duration)}. This is a real read-out of the timeline cue list — a scripting/automation API is a future milestone.</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Broadcast AR ---------------- */
+const AR_KINDS: ArElementKind[] = ['card', 'text', 'box', 'sphere', 'cylinder'];
+
+function ArVec3({ label, values, step, toDeg, onChange }: { label: string; values: [number, number, number]; step: number; toDeg?: boolean; onChange: (v: [number, number, number]) => void }) {
+  const f = toDeg ? 180 / Math.PI : 1;
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>{label}{toDeg ? ' (°)' : ''}</div>
+      <div style={{ display: 'flex', gap: 4 }}>
+        {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+          <input key={axis} type="number" step={step} value={Math.round(values[i] * f * 1000) / 1000}
+            aria-label={`${label} ${axis}`}
+            onChange={(e) => { const next: [number, number, number] = [...values]; const n = parseFloat(e.currentTarget.value); if (Number.isFinite(n)) { next[i] = n / f; onChange(next); } }}
+            style={{ width: '33%', minWidth: 0, fontSize: 9, padding: '2px 4px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 2, color: 'var(--text-primary)' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ArWorkspace() {
+  const { elements, selectedId, addElement, removeElement, patchElement, selectElement, setOnAir } = useAr();
+  const { dispatch } = useShell();
+  const selected = elements.find((e) => e.id === selectedId) ?? null;
+
+  return (
+    <div data-testid="ar-surface" style={{ flex: 1, minHeight: 0, background: 'var(--bg-viewport)', display: 'flex' }}>
+      <div className="scroll-y" style={{ width: 290, borderRight: '1px solid var(--border-subtle)', padding: 12, flexShrink: 0 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Broadcast AR</h2>
+        <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: '0 0 10px' }}>
+          Virtual AR elements anchored in the studio world. Put one ON AIR and it is composited into the Program output, staying locked to the set as the tracked camera moves. Switch to <strong>Builder</strong> to see them in the scene.
+        </p>
+        <div className="section-label" style={{ marginBottom: 6 }}>Add AR element</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 4, marginBottom: 14 }}>
+          {AR_KINDS.map((k) => (
+            <button key={k} data-testid={`add-ar-${k}`} onClick={() => addElement(defaultArElement(k))}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 8px', border: '1px solid var(--border-subtle)', borderRadius: 4, background: 'var(--bg-panel)', color: 'var(--text-primary)', fontSize: 11 }}>
+              <Boxes size={13} style={{ color: 'var(--accent-blue)' }} /> {arKindLabel(k)}
+            </button>
+          ))}
+        </div>
+        <div className="section-label" style={{ marginBottom: 6 }}>Elements ({elements.length})</div>
+        {elements.length === 0 ? (
+          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>No AR elements yet — add one above.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {elements.map((e) => {
+              const sel = e.id === selectedId;
+              return (
+                <div key={e.id} data-testid={`ar-row-${e.id}`} onClick={() => selectElement(e.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', cursor: 'pointer', borderRadius: 4,
+                    border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                    borderLeft: `3px solid ${e.onAir ? 'var(--status-rec)' : sel ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+                    background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-panel)' }}>
+                  <span style={{ flex: 1, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.label || arKindLabel(e.kind)}</span>
+                  {e.onAir && <span className="mono" style={{ fontSize: 8, fontWeight: 700, color: 'var(--status-rec)' }}>ON AIR</span>}
+                  <button onClick={(ev) => { ev.stopPropagation(); setOnAir(e.id, !e.onAir); dispatch({ type: 'SHOW_TOAST', message: `${e.label || arKindLabel(e.kind)} — ${!e.onAir ? 'ON AIR' : 'off'}` }); }}
+                    title={e.onAir ? 'Take off air' : 'Put on air'}
+                    style={{ width: 24, height: 22, fontSize: 8, fontWeight: 700, borderRadius: 3, border: `1px solid ${e.onAir ? 'var(--status-rec)' : 'var(--border-subtle)'}`, background: e.onAir ? 'rgba(239,68,68,0.15)' : 'transparent', color: e.onAir ? 'var(--status-rec)' : 'var(--text-secondary)' }}>
+                    {e.onAir ? <Square size={10} fill="currentColor" /> : 'AIR'}
+                  </button>
+                  <button onClick={(ev) => { ev.stopPropagation(); removeElement(e.id); }} aria-label={`Delete ${e.label}`} style={{ width: 22, height: 22, color: 'var(--text-muted)' }}><Trash2 size={12} /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="scroll-y" style={{ flex: 1, padding: 16, minWidth: 0 }}>
+        {selected ? (
+          <div style={{ maxWidth: 380 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{arKindLabel(selected.kind)}</h3>
+              <button onClick={() => setOnAir(selected.id, !selected.onAir)} data-testid="ar-air-toggle"
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 3, border: `1px solid ${selected.onAir ? 'var(--status-rec)' : 'var(--border-subtle)'}`, background: selected.onAir ? 'rgba(239,68,68,0.15)' : 'var(--bg-panel-raised)', color: selected.onAir ? 'var(--status-rec)' : 'var(--text-secondary)' }}>
+                {selected.onAir ? 'Take Off Air' : 'Put On Air'}
+              </button>
+            </div>
+            {(selected.kind === 'card' || selected.kind === 'text') && (
+              <label style={{ display: 'block', marginBottom: 8 }}>
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 3 }}>Label</span>
+                <input value={selected.label} onChange={(e) => patchElement(selected.id, { label: e.currentTarget.value })} aria-label="AR label"
+                  style={{ width: '100%', fontSize: 11, padding: '4px 6px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 3, color: 'var(--text-primary)' }} />
+              </label>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 10 }}>
+              <span>Colour</span>
+              <input type="color" value={selected.color} onChange={(e) => patchElement(selected.id, { color: e.currentTarget.value })} style={{ width: 44, height: 22, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="AR colour" />
+            </label>
+            <ArVec3 label="Position" step={0.1} values={selected.position} onChange={(v) => patchElement(selected.id, { position: v })} />
+            <ArVec3 label="Rotation" step={1} toDeg values={selected.rotation} onChange={(v) => patchElement(selected.id, { rotation: v })} />
+            <ArVec3 label="Scale" step={0.1} values={selected.scaling} onChange={(v) => patchElement(selected.id, { scaling: v })} />
+            <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 8 }}>Anchored in world space — under FreeD camera tracking it stays locked to the set. On-air elements appear in the recorded/streamed Program output.</p>
+          </div>
+        ) : (
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>Select or add an AR element.</div>
+        )}
       </div>
     </div>
   );

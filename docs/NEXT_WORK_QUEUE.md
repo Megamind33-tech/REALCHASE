@@ -11,7 +11,7 @@
 - **Verification (this pass):** `tsc -b` clean; anti-demo smoke passes.
 - **Known blocker:** Production `vite build` exceeded 304.5s without output on the OneDrive workstation (builds ~2.5–3 min in CI/Linux). Do not report the production bundle as passing on that workstation until resolved.
 - **Post-milestone hardening (done since M8):** revived all 6 placeholder module screens into real workspaces; asset/group delete (button + Delete key); graphic font selection; headset WebXR *preview* (relabelled — not broadcast AR); **real Web Audio mixer** (per-source fader/mute/solo + master into the recorded/streamed bus).
-- **NEXT MAJOR FEATURE — Broadcast AR (Zero Density-style):** AR graphics/objects world-locked to the FreeD-tracked camera, composited into the on-air program output (no headset). Foundations exist (camera tracking, 3D set, program compositing). This is the real "AR" the product needs; the headset WebXR is only a set preview.
+- **DONE — Broadcast AR (Zero Density-style):** world-anchored AR elements (card/3D-text/box/sphere/cylinder) in a new **AR module**, toggled on-air into the Program composite, locked to the set under FreeD tracking (no headset). Engine `upsertArElement`/`removeArElement`; `ArContext` + `ArSync` persist/replay. Future: floor-plane snapping + data-bound AR templates.
 - **Then:** M9 (performance & stress testing), M10 (final polish). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  

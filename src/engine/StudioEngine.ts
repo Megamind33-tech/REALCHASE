@@ -8,6 +8,7 @@ import { Effect } from '@babylonjs/core/Materials/effect';
 import { PBRMaterial } from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial';
 import { StandardMaterial } from '@babylonjs/core/Materials/standardMaterial';
+import { DynamicTexture } from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import { RawTexture } from '@babylonjs/core/Materials/Textures/rawTexture';
 import { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTargetTexture';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture';
@@ -50,6 +51,7 @@ import { WebXRDefaultExperience } from '@babylonjs/core/XR/webXRDefaultExperienc
 import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
+import type { ArElement } from '@/ar/arTypes';
 import { DEFAULT_LIGHTING, hexToRgb, rgbToHex, type LightingSettings } from './lighting';
 
 export type XRMode = 'immersive-vr' | 'immersive-ar';
@@ -189,6 +191,8 @@ export class StudioEngine {
   private graphics: BroadcastGraphics | null = null;
   private xr: WebXRDefaultExperience | null = null;
   private xrMode: XRMode | null = null;
+  private arRoot: TransformNode | null = null;
+  private arElements = new Map<string, { mesh: Mesh; kind: string; texture: DynamicTexture | null; material: StandardMaterial }>();
   private resizeObserver: ResizeObserver | null = null;
   private listeners = new Set<StudioEngineListener>();
   private refs: DeskSceneRefs | null = null;
@@ -267,6 +271,10 @@ export class StudioEngine {
     // Real broadcast graphics overlay rendered ON the live scene (so on-air
     // graphics are part of the rendered frame, captured by output/thumbnails).
     this.graphics = new BroadcastGraphics(this.scene);
+
+    // Broadcast-AR anchor: a world-space node (NOT parented to any camera) so AR
+    // elements stay locked in the real set as the tracked camera moves.
+    this.arRoot = new TransformNode('arRoot', this.scene);
 
     // Freeze materials that never change so Babylon skips their per-frame
     // readiness/dirty checks. The dynamic ones (desk, floor, desk-screen, and
@@ -1521,6 +1529,100 @@ export class StudioEngine {
     this.xrMode = null;
   }
 
+  // ---- Broadcast AR: world-anchored 3D elements composited into Program ----
+  private buildArMesh(def: ArElement): { mesh: Mesh; texture: DynamicTexture | null; material: StandardMaterial } {
+    const scene = this.scene!;
+    const mat = new StandardMaterial(`arMat-${def.id}`, scene);
+    let mesh: Mesh;
+    let texture: DynamicTexture | null = null;
+    if (def.kind === 'box') {
+      mesh = MeshBuilder.CreateBox(`ar-${def.id}`, { size: 0.6 }, scene);
+    } else if (def.kind === 'sphere') {
+      mesh = MeshBuilder.CreateSphere(`ar-${def.id}`, { diameter: 0.6, segments: 16 }, scene);
+    } else if (def.kind === 'cylinder') {
+      mesh = MeshBuilder.CreateCylinder(`ar-${def.id}`, { height: 0.8, diameter: 0.5 }, scene);
+    } else {
+      // 'card' or 'text' — a flat panel carrying a drawn label.
+      const isCard = def.kind === 'card';
+      mesh = MeshBuilder.CreatePlane(`ar-${def.id}`, { width: isCard ? 1.6 : 1.4, height: isCard ? 0.9 : 0.5 }, scene);
+      mesh.billboardMode = 0;
+      texture = new DynamicTexture(`arTex-${def.id}`, { width: isCard ? 512 : 512, height: isCard ? 288 : 160 }, scene, true);
+      texture.hasAlpha = true;
+      mat.diffuseTexture = texture;
+      mat.opacityTexture = texture;
+      mat.emissiveColor = new Color3(1, 1, 1);
+      mat.backFaceCulling = false;
+    }
+    mesh.material = mat;
+    mesh.metadata = { chaseAr: def.id };
+    return { mesh, texture, material: mat };
+  }
+
+  private styleArMesh(rec: { mesh: Mesh; kind: string; texture: DynamicTexture | null; material: StandardMaterial }, def: ArElement) {
+    const [r, g, b] = hexToRgb(def.color);
+    if (rec.texture) {
+      // Redraw the label panel.
+      const tex = rec.texture;
+      const size = tex.getSize();
+      const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+      ctx.clearRect(0, 0, size.width, size.height);
+      if (def.kind === 'card') {
+        ctx.fillStyle = 'rgba(8,12,20,0.82)';
+        ctx.fillRect(0, 0, size.width, size.height);
+        ctx.fillStyle = def.color;
+        ctx.fillRect(0, 0, 14, size.height); // accent bar
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 56px Inter, sans-serif';
+        ctx.fillText(def.label || '', 40, 120, size.width - 60);
+        ctx.fillStyle = def.color;
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillText('AR · LIVE', 40, 200, size.width - 60);
+      } else {
+        ctx.fillStyle = def.color;
+        ctx.font = 'bold 110px Impact, Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(def.label || '', size.width / 2, size.height / 2, size.width - 20);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
+      tex.update();
+    } else {
+      rec.material.diffuseColor = new Color3(r, g, b);
+      rec.material.emissiveColor = new Color3(r * 0.25, g * 0.25, b * 0.25);
+    }
+  }
+
+  /** Create or update an AR element from its definition (idempotent). */
+  upsertArElement(def: ArElement): void {
+    if (!this.scene || !this.arRoot) return;
+    let rec = this.arElements.get(def.id);
+    if (rec && rec.kind !== def.kind) { rec.mesh.dispose(); rec.texture?.dispose(); this.arElements.delete(def.id); rec = undefined; }
+    if (!rec) {
+      const built = this.buildArMesh(def);
+      built.mesh.parent = this.arRoot;
+      rec = { mesh: built.mesh, kind: def.kind, texture: built.texture, material: built.material };
+      this.arElements.set(def.id, rec);
+    }
+    rec.mesh.position.set(def.position[0], def.position[1], def.position[2]);
+    rec.mesh.rotation.set(def.rotation[0], def.rotation[1], def.rotation[2]);
+    rec.mesh.scaling.set(def.scaling[0], def.scaling[1], def.scaling[2]);
+    this.styleArMesh(rec, def);
+    rec.mesh.setEnabled(def.onAir); // on-air = visible in Program output
+  }
+
+  removeArElement(id: string): void {
+    const rec = this.arElements.get(id);
+    if (!rec) return;
+    rec.mesh.dispose();
+    rec.texture?.dispose();
+    this.arElements.delete(id);
+  }
+
+  clearArElements(): void {
+    for (const id of [...this.arElements.keys()]) this.removeArElement(id);
+  }
+
   // ---- Studio lighting (real Babylon lights) ----
   private lighting: LightingSettings = DEFAULT_LIGHTING;
 
@@ -1766,6 +1868,9 @@ export class StudioEngine {
     }
     this.trackingActive = false;
     this.resizeObserver?.disconnect();
+    this.clearArElements();
+    this.arRoot?.dispose();
+    this.arRoot = null;
     this.xr?.dispose();
     this.xr = null;
     this.xrMode = null;

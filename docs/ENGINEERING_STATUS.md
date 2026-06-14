@@ -1,5 +1,23 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
+## Broadcast AR Pass (2026-06-14) — the real AR
+
+- Implemented **broadcast AR** (Zero Density / Reality-Engine style), distinct
+  from the headset XR preview. AR elements are **real 3D objects anchored in the
+  studio world space** (`arRoot`, a TransformNode that is NOT parented to any
+  camera). Under FreeD camera tracking they stay locked to the set; because the
+  studio scene renders into the Program output, an **on-air AR element is
+  composited into the live recorded/streamed broadcast** — no headset.
+- Engine: `upsertArElement` / `removeArElement` / `clearArElements`. Element
+  kinds: Data Card + 3D Text (drawn via DynamicTexture), Box, Sphere, Cylinder.
+  `onAir` toggles scene visibility (→ in/out of Program). Idempotent upsert.
+- State + sync: `ArContext` is the source of truth; `ArSync` replays elements
+  onto a rebuilt engine (Builder re-entry) and tears down removed ones.
+- New **AR module** workspace: add elements, edit label/colour/position/
+  rotation/scale, and per-element **Put On Air / Take Off Air**. Real controls.
+- Foundations reused: FreeD tracking (camera), the 3D set, program-output
+  compositing. No new fork; pure Babylon (Apache-2.0).
+
 ## Audio Mixer Pass (2026-06-14)
 
 - **Real broadcast audio mixer** (`src/audio/audioMixer.ts`, Web Audio API).
@@ -21,12 +39,10 @@
   avoid confusion. It is **NOT broadcast AR**.
 - **Broadcast AR (Zero Density / Reality-Engine style)** — AR graphics/objects
   anchored in the camera-tracked studio world space and composited into the
-  *on-air program output* over the live camera — is a **distinct feature that is
-  not yet built**. Foundations already present: FreeD camera tracking, the live
-  3D set, and program-output compositing. Planned approach: an "AR layer" of
-  scene objects/graphics that are world-locked to the tracked camera and toggled
-  on-air into the Program composite (no headset required). Tracked in
-  NEXT_WORK_QUEUE as the next major feature.
+  *on-air program output* — is now **implemented** (see "Broadcast AR Pass"
+  above): a world-anchored AR layer with on-air toggling, in the new AR module.
+  Still future for AR: snapping AR elements to tracked floor planes and richer
+  data-bound templates.
 
 ## WebXR (headset preview) Pass (2026-06-14)
 

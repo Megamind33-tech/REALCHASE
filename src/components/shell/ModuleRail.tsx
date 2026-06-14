@@ -1,6 +1,6 @@
 import {
   Hammer, SwitchCamera, Layers, Package, Type, SquareStack, Sun, Camera, Volume2,
-  ScrollText, Radio, Settings,
+  ScrollText, Radio, Settings, Boxes,
 } from 'lucide-react';
 import type { ModuleId } from '@/context/shellTypes';
 import { useShell } from '@/context/ShellContext';
@@ -11,6 +11,7 @@ const MODULES: { id: ModuleId; label: string; icon: typeof Hammer }[] = [
   { id: 'scenes', label: 'Scenes', icon: Layers },
   { id: 'assets', label: 'Assets', icon: Package },
   { id: 'graphics', label: 'Graphics', icon: Type },
+  { id: 'ar', label: 'AR', icon: Boxes },
   { id: 'overlays', label: 'Overlays', icon: SquareStack },
   { id: 'lighting', label: 'Lighting', icon: Sun },
   { id: 'cameras', label: 'Cameras', icon: Camera },

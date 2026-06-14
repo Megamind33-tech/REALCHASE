@@ -12,6 +12,7 @@ import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
+import type { ArElement } from '@/ar/arTypes';
 import type { LightingSettings } from '@/engine/lighting';
 import { useShell } from './ShellContext';
 
@@ -65,6 +66,9 @@ interface EditorBridgeValue {
   getXRSupport: () => Promise<{ vr: boolean; ar: boolean }>;
   enterXR: (mode: XRMode) => Promise<boolean>;
   exitXR: () => Promise<void>;
+  upsertArElement: (def: ArElement) => void;
+  removeArElement: (id: string) => void;
+  clearArElements: () => void;
   assets: ImportedAsset[];
   groups: AssetGroup[];
   sceneNodes: SceneNodeInfo[];
@@ -306,6 +310,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const enterXR = useCallback((mode: XRMode) => engineRef.current?.enterXR(mode) ?? Promise.resolve(false), []);
   const exitXR = useCallback(() => engineRef.current?.exitXR() ?? Promise.resolve(), []);
 
+  const upsertArElement = useCallback((def: ArElement) => { engineRef.current?.upsertArElement(def); }, []);
+  const removeArElement = useCallback((id: string) => { engineRef.current?.removeArElement(id); }, []);
+  const clearArElements = useCallback(() => { engineRef.current?.clearArElements(); }, []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -353,6 +361,9 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         getXRSupport,
         enterXR,
         exitXR,
+        upsertArElement,
+        removeArElement,
+        clearArElements,
         assets,
         groups,
         sceneNodes,

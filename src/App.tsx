@@ -5,6 +5,7 @@ import { ScenesProvider } from '@/context/ScenesContext';
 import { GraphicsProvider } from '@/context/GraphicsContext';
 import { TimelineProvider } from '@/context/TimelineContext';
 import { LightingProvider } from '@/context/LightingContext';
+import { ArProvider } from '@/context/ArContext';
 import { AppShell } from '@/components/shell/AppShell';
 
 export default function App() {
@@ -16,7 +17,9 @@ export default function App() {
             <GraphicsProvider>
               <TimelineProvider>
                 <LightingProvider>
-                  <AppShell />
+                  <ArProvider>
+                    <AppShell />
+                  </ArProvider>
                 </LightingProvider>
               </TimelineProvider>
             </GraphicsProvider>

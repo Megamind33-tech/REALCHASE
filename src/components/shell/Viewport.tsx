@@ -12,7 +12,7 @@ import { ScenesPanel } from '@/components/shell/ScenesPanel';
 import { GraphicsPanel } from '@/components/shell/GraphicsPanel';
 import {
   CamerasWorkspace, LightingWorkspace, AudioWorkspace, OutputsWorkspace,
-  OverlaysWorkspace, ScriptsWorkspace, SettingsWorkspace,
+  OverlaysWorkspace, ScriptsWorkspace, SettingsWorkspace, ArWorkspace,
 } from '@/components/shell/ModuleWorkspaces';
 import { XrControls } from '@/components/shell/XrControls';
 import type { QualityMode, TransformMode } from '@/context/shellTypes';
@@ -44,6 +44,7 @@ export function Viewport() {
     return <GraphicsPanel />;
   }
 
+  if (state.activeModule === 'ar') return <ArWorkspace />;
   if (state.activeModule === 'cameras') return <CamerasWorkspace />;
   if (state.activeModule === 'lighting') return <LightingWorkspace />;
   if (state.activeModule === 'audio') return <AudioWorkspace />;
