@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CHASE · Live</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0a0c10; color: #e8eaed;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  .wrap { height: 100%; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+    border-bottom: 1px solid #1c2230; }
+  .brand { font-weight: 700; letter-spacing: .04em; font-size: 14px; }
+  .live-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+    padding: 3px 9px; border-radius: 999px; background: #2a2f3a; color: #9aa3b2; }
+  .live-pill.on { background: #3a0f14; color: #ff5566; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .on .dot { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+  main { flex: 1; display: grid; place-items: center; padding: 16px; min-height: 0; }
+  video { width: 100%; height: 100%; max-height: 100%; object-fit: contain; background: #000;
+    border-radius: 8px; }
+  .status { font-size: 12px; color: #9aa3b2; }
+  footer { padding: 8px 16px; font-size: 11px; color: #6b7280; border-top: 1px solid #1c2230; }
+  a { color: #7aa2ff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="brand">CHASE</span>
+    <span id="pill" class="live-pill"><span class="dot"></span><span id="pillText">connecting…</span></span>
+    <span style="flex:1"></span>
+    <span class="status" id="latency"></span>
+  </header>
+  <main>
+    <video id="v" autoplay playsinline controls muted></video>
+  </main>
+  <footer id="foot">Public viewer · WebRTC (WHEP) low-latency playback.</footer>
+</div>
+<script>
+// Real WHEP (WebRTC-HTTP Egress Protocol) player. Pulls the live Program output
+// straight from the relay over WebRTC — the same low-latency path a broadcaster
+// embeds on their public site. No SDK, no polling. ?src= overrides the endpoint.
+const params = new URLSearchParams(location.search);
+const whep = params.get('src') || (location.protocol + '//' + location.hostname + ':8889/chase/whep');
+const v = document.getElementById('v');
+const pill = document.getElementById('pill');
+const pillText = document.getElementById('pillText');
+const foot = document.getElementById('foot');
+
+function setState(on, text) {
+  pill.classList.toggle('on', !!on);
+  pillText.textContent = text;
+}
+
+async function play() {
+  setState(false, 'connecting…');
+  const pc = new RTCPeerConnection();
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+  const inbound = new MediaStream();
+  pc.ontrack = (e) => { inbound.addTrack(e.track); v.srcObject = inbound; };
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    if (s === 'connected') setState(true, 'LIVE');
+    else if (s === 'failed' || s === 'disconnected' || s === 'closed') setState(false, 'offline');
+  };
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await new Promise((res) => {
+    if (pc.iceGatheringState === 'complete') return res();
+    const t = setTimeout(res, 2500);
+    pc.addEventListener('icegatheringstatechange', () => {
+      if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
+    });
+  });
+  let resp;
+  try {
+    resp = await fetch(whep, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+  } catch (err) {
+    setState(false, 'offline');
+    foot.textContent = 'Stream offline — waiting for the studio to go on air. (' + err + ')';
+    pc.close();
+    setTimeout(play, 3000);
+    return;
+  }
+  if (!resp.ok) {
+    setState(false, 'offline');
+    foot.textContent = 'Stream offline (' + resp.status + ') — retrying…';
+    pc.close();
+    setTimeout(play, 3000);
+    return;
+  }
+  const answer = await resp.text();
+  await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+  foot.textContent = 'Public viewer · WebRTC (WHEP) · ' + whep;
+}
+play();
+</script>
+</body>
+</html>

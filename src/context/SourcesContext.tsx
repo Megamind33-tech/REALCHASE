@@ -9,7 +9,14 @@ import {
   type ReactNode,
 } from 'react';
 import { useEditorBridge } from './EditorBridgeContext';
-import { whipPublish, type WhipSession } from '@/streaming/whip';
+import { whipPublish, type WhipSession } from '@/output/whip';
+import {
+  deriveRelay, configureFanout, clearFanout, type RelayEndpoints,
+} from '@/output/relay';
+import {
+  DEFAULT_DESTINATIONS, resolveTargets, websiteEnabled,
+  type StreamDestination, type OutputLeg, type LegKind,
+} from '@/output/destinations';
 import {
   DEFAULT_KEYING_SETTINGS,
   describeMediaError,
@@ -87,6 +94,12 @@ interface SourcesValue {
   liveLabel: string;
   streamError: string | null;
   toggleAir: (url: string) => void;
+  // Multi-destination fan-out (YouTube/Facebook/Twitch + public live website).
+  destinations: StreamDestination[];
+  updateDestination: (id: string, patch: Partial<StreamDestination>) => void;
+  updateDestinationLeg: (id: string, kind: LegKind, patch: Partial<OutputLeg>) => void;
+  armedTargetCount: number;
+  liveWebsite: { whepUrl: string; hlsUrl: string } | null;
 }
 
 function pickRecorderMime(): string {
@@ -287,8 +300,24 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
   const [onAir, setOnAir] = useState(false);
   const [airElapsed, setAirElapsed] = useState(0);
   const [streamError, setStreamError] = useState<string | null>(null);
-  const airRef = useRef<{ session: WhipSession; timer: number; canvasStream: MediaStream | null } | null>(null);
+  const [liveWebsite, setLiveWebsite] = useState<{ whepUrl: string; hlsUrl: string } | null>(null);
+  const airRef = useRef<{ session: WhipSession; timer: number; canvasStream: MediaStream | null; ep: RelayEndpoints | null } | null>(null);
   const canStream = Boolean(programSource?.stream) && typeof RTCPeerConnection !== 'undefined';
+
+  // Stream destinations (in-memory only — stream keys are secrets and are never
+  // written to project files or logs).
+  const [destinations, setDestinations] = useState<StreamDestination[]>(DEFAULT_DESTINATIONS);
+  const destinationsRef = useRef(destinations);
+  destinationsRef.current = destinations;
+  const armedTargetCount = resolveTargets(destinations).length;
+
+  const updateDestination = useCallback((id: string, patch: Partial<StreamDestination>) => {
+    setDestinations((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  }, []);
+
+  const updateDestinationLeg = useCallback((id: string, kind: LegKind, patch: Partial<OutputLeg>) => {
+    setDestinations((ds) => ds.map((d) => (d.id === id ? { ...d, [kind]: { ...d[kind], ...patch } } : d)));
+  }, []);
 
   const stopAir = useCallback(async () => {
     const a = airRef.current;
@@ -298,23 +327,41 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     a.canvasStream?.getTracks().forEach((t) => t.stop());
     setOnAir(false);
     setAirElapsed(0);
+    setLiveWebsite(null);
     try { await a.session.close(); } catch { /* server may already have reaped the session */ }
+    if (a.ep) await clearFanout(a.ep); // tear the relay fan-out down so no ffmpeg lingers
   }, []);
 
   const startAir = useCallback(async (url: string) => {
     const program = sourcesRef.current.find((s) => s.id === state.programId);
     if (!program?.stream || typeof RTCPeerConnection === 'undefined') return;
     if (!url.trim()) { setStreamError('Enter a WHIP endpoint URL first.'); return; }
+    setStreamError(null);
     // Publish the composited studio output (canvas) when available, else the raw
     // Program video track, plus the Program audio.
     const canvasStream = captureOutputStream(30);
     const videoTracks = canvasStream?.getVideoTracks().length ? canvasStream.getVideoTracks() : program.stream.getVideoTracks();
     const out = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
+
+    // Arm the relay fan-out BEFORE publishing so MediaMTX's runOnReady fires the
+    // moment the WHIP stream is ready. Website/WHEP playback works regardless; a
+    // fan-out failure is surfaced but never blocks going to air.
+    const ep = deriveRelay(url.trim());
+    const targets = resolveTargets(destinationsRef.current);
+    if (ep) {
+      try {
+        await configureFanout(ep, targets);
+      } catch (err) {
+        setStreamError(`Destinations not fully armed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
     let session: WhipSession;
     try {
       session = await whipPublish(url.trim(), out);
     } catch (err) {
       canvasStream?.getTracks().forEach((t) => t.stop());
+      if (ep) await clearFanout(ep);
       setStreamError(err instanceof Error ? err.message : String(err));
       return;
     }
@@ -326,10 +373,13 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     });
     const started = Date.now();
     const timer = window.setInterval(() => setAirElapsed(Date.now() - started), 500);
-    airRef.current = { session, timer, canvasStream };
-    setStreamError(null);
+    airRef.current = { session, timer, canvasStream, ep };
     setOnAir(true);
     setAirElapsed(0);
+    // Surface the public live-website URLs when its leg is switched on.
+    if (ep && websiteEnabled(destinationsRef.current)) {
+      setLiveWebsite({ whepUrl: ep.whepUrl, hlsUrl: ep.hlsUrl });
+    }
   }, [captureOutputStream, state.programId, stopAir]);
 
   const toggleAir = useCallback((url: string) => {
@@ -364,6 +414,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     liveLabel,
     streamError,
     toggleAir,
+    destinations,
+    updateDestination,
+    updateDestinationLeg,
+    armedTargetCount,
+    liveWebsite,
   };
 
   return <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>;

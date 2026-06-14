@@ -111,11 +111,17 @@ if (/<AudioMeter\b/.test(outputPanel)) {
 if (!outputPanel.includes('No real audio source connected')) {
   fail('outputs surface does not expose the honest no-audio-source fallback state');
 }
-// Output now publishes for real over WHIP from the toolbar. The destinations
-// list must still be honest that the named per-platform destinations are not
-// individually wired (publishing goes to the single WHIP endpoint).
-if (!outputPanel.includes('Per-destination publishing not wired')) {
-  fail('stream destination panel does not honestly mark per-destination publishing as unwired');
+// Output fans out for real to per-platform destinations via the local relay.
+// Each station must take REAL credentials (no faked "connected" state): an
+// ingest URL + a stream key, plus the public live-website (WHEP) page.
+if (!outputPanel.includes('stream key')) {
+  fail('stream destination panel does not collect real per-station stream keys');
+}
+if (!outputPanel.includes('live.html')) {
+  fail('stream destination panel does not expose the real public live-website page');
+}
+if (!outputPanel.includes('data-testid="armed-target-count"')) {
+  fail('stream destination panel does not surface the real armed-leg count');
 }
 
 const viewport = read('src/components/shell/Viewport.tsx');
