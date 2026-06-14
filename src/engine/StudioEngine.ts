@@ -42,11 +42,14 @@ import { DEFAULT_KEYING_SETTINGS, type KeyingSettings, type PlacementMode } from
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
+export type TrackingStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
 export type StudioEngineEvent =
   | { type: 'ready' }
   | { type: 'fps'; value: number }
   | { type: 'selected'; objectId: string | null }
   | { type: 'scene-graph'; nodes: SceneNodeInfo[] }
+  | { type: 'tracking'; status: TrackingStatus; message?: string }
   | { type: 'error'; message: string };
 
 // Minimal unlit textured shader for the Program media plane. Babylon's
@@ -159,6 +162,7 @@ export class StudioEngine {
   private trackingObserver: Observer<Scene> | null = null;
   private trackingSmoothing = 0.4;
   private smoothTarget = new Vector3(0, 1.4, 2);
+  private trackingSocket: WebSocket | null = null;
   private viewportMode: '3d' | '2d' = '3d';
   private deskProps: DeskProperties | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -494,21 +498,95 @@ export class StudioEngine {
    * the pipeline can be verified; real tracking data replaces it via
    * applyCameraPose(). Disabling restores the selected studio camera.
    */
+  private enableTrackedCamera() {
+    if (!this.scene) return;
+    if (!this.trackedCamera) {
+      this.trackedCamera = new FreeCamera('trackedCam', new Vector3(0, 1.6, -9), this.scene);
+      this.trackedCamera.minZ = 0.1;
+      this.trackedCamera.maxZ = 200;
+    }
+    this.cameras.get(this.activeCameraId)?.detachControl();
+    this.cameras.forEach((c) => c.setEnabled(false));
+    this.orthoCamera?.setEnabled(false);
+    this.trackedCamera.setEnabled(true);
+    this.scene.activeCamera = this.trackedCamera;
+    this.trackingActive = true;
+    this.markInteraction();
+  }
+
+  /**
+   * Connect to a real external camera-tracking source over WebSocket. Each JSON
+   * message `{ position:[x,y,z], target:[x,y,z], fov?|focalLength? }` drives the
+   * virtual camera via applyCameraPose (smoothing + lens match still apply).
+   * This is the production hook — a FreeD/mo-sys/NDI bridge forwards poses here.
+   */
+  connectTrackingSource(url: string) {
+    if (!this.scene) return;
+    this.disconnectTrackingSource(false);
+    this.emit({ type: 'tracking', status: 'connecting' });
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch (e) {
+      this.emit({ type: 'tracking', status: 'error', message: e instanceof Error ? e.message : 'bad URL' });
+      return;
+    }
+    this.trackingSocket = socket;
+    socket.onopen = () => {
+      // Real data drives the camera — drop the synthetic test signal if running.
+      if (this.trackingObserver && this.scene) {
+        this.scene.onBeforeRenderObservable.remove(this.trackingObserver);
+        this.trackingObserver = null;
+      }
+      this.enableTrackedCamera();
+      this.emit({ type: 'tracking', status: 'connected' });
+    };
+    socket.onmessage = (ev) => {
+      try {
+        const p = JSON.parse(typeof ev.data === 'string' ? ev.data : '') as {
+          position?: number[]; target?: number[]; fov?: number; focalLength?: number;
+        };
+        if (!Array.isArray(p.position) || !Array.isArray(p.target)) return;
+        const fov = typeof p.fov === 'number' ? p.fov
+          : typeof p.focalLength === 'number' ? focalLengthToFov(p.focalLength)
+            : (this.deskProps ? focalLengthToFov(this.deskProps.focalLength) : 0.8);
+        this.applyCameraPose(
+          new Vector3(p.position[0], p.position[1], p.position[2]),
+          new Vector3(p.target[0], p.target[1], p.target[2]),
+          fov,
+        );
+        this.markInteraction();
+      } catch { /* ignore malformed tracking frame */ }
+    };
+    socket.onerror = () => this.emit({ type: 'tracking', status: 'error', message: 'connection error' });
+    socket.onclose = () => {
+      if (this.trackingSocket === socket) {
+        this.trackingSocket = null;
+        this.emit({ type: 'tracking', status: 'disconnected' });
+      }
+    };
+  }
+
+  disconnectTrackingSource(restoreCamera = true) {
+    if (this.trackingSocket) {
+      const s = this.trackingSocket;
+      s.onopen = null; s.onmessage = null; s.onerror = null; s.onclose = null;
+      try { s.close(); } catch { /* already closing */ }
+      this.trackingSocket = null;
+    }
+    if (restoreCamera && this.trackingActive && !this.trackingObserver) {
+      this.trackingActive = false;
+      this.trackedCamera?.setEnabled(false);
+      this.setActiveCamera(this.activeCameraId);
+      this.emit({ type: 'tracking', status: 'disconnected' });
+    }
+  }
+
   setCameraTracking(enabled: boolean) {
     if (!this.scene) return;
     this.markInteraction();
     if (enabled) {
-      if (!this.trackedCamera) {
-        this.trackedCamera = new FreeCamera('trackedCam', new Vector3(0, 1.6, -9), this.scene);
-        this.trackedCamera.minZ = 0.1;
-        this.trackedCamera.maxZ = 200;
-      }
-      this.cameras.get(this.activeCameraId)?.detachControl();
-      this.cameras.forEach((c) => c.setEnabled(false));
-      this.orthoCamera?.setEnabled(false);
-      this.trackedCamera.setEnabled(true);
-      this.scene.activeCamera = this.trackedCamera;
-      this.trackingActive = true;
+      this.enableTrackedCamera();
       if (!this.trackingObserver) {
         this.trackingObserver = this.scene.onBeforeRenderObservable.add(() => {
           if (!this.trackingActive) return;
@@ -539,6 +617,13 @@ export class StudioEngine {
 
   setActiveCamera(id: CameraId) {
     this.markInteraction();
+    if (this.trackingSocket) {
+      const s = this.trackingSocket;
+      s.onopen = null; s.onmessage = null; s.onerror = null; s.onclose = null;
+      try { s.close(); } catch { /* already closing */ }
+      this.trackingSocket = null;
+      this.emit({ type: 'tracking', status: 'disconnected' });
+    }
     if (this.trackingActive) {
       this.trackingActive = false;
       if (this.trackingObserver && this.scene) {
@@ -1011,6 +1096,12 @@ export class StudioEngine {
     if (this.trackingObserver) {
       this.scene?.onBeforeRenderObservable.remove(this.trackingObserver);
       this.trackingObserver = null;
+    }
+    if (this.trackingSocket) {
+      const s = this.trackingSocket;
+      s.onopen = null; s.onmessage = null; s.onerror = null; s.onclose = null;
+      try { s.close(); } catch { /* already closing */ }
+      this.trackingSocket = null;
     }
     this.trackingActive = false;
     this.resizeObserver?.disconnect();

@@ -20,9 +20,10 @@ const TRANSFORM_MODES: { id: TransformMode; icon: typeof Box; label: string }[] 
 
 export function Viewport() {
   const { state, dispatch } = useShell();
-  const { engine, setCameraTracking, setTrackingSmoothing } = useEditorBridge();
+  const { engine, setCameraTracking, setTrackingSmoothing, connectTracking, disconnectTracking, trackingStatus, trackingLinked, trackingLabel } = useEditorBridge();
   const [tracking, setTracking] = useState(false);
   const [smoothing, setSmoothing] = useState(0.4);
+  const [trackUrl, setTrackUrl] = useState('ws://localhost:7777');
 
   if (state.activeModule === 'switcher') {
     return <SwitcherPanel />;
@@ -120,21 +121,38 @@ export function Viewport() {
           >
             <Crosshair size={14} />
           </IconButton>
-          {tracking && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text-secondary)' }} title="Tracking smoothing (jitter rejection)">
-              Smooth
-              <input
-                type="range"
-                min={0}
-                max={0.97}
-                step={0.01}
-                value={smoothing}
-                onChange={(e) => { const v = Number(e.target.value); setSmoothing(v); setTrackingSmoothing(v); }}
-                style={{ width: 70, accentColor: 'var(--accent-blue)' }}
-                aria-label="Tracking smoothing"
-              />
-            </label>
-          )}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text-secondary)' }} title="Tracking smoothing (jitter rejection)">
+            Smooth
+            <input
+              type="range"
+              min={0}
+              max={0.97}
+              step={0.01}
+              value={smoothing}
+              onChange={(e) => { const v = Number(e.target.value); setSmoothing(v); setTrackingSmoothing(v); }}
+              style={{ width: 60, accentColor: 'var(--accent-blue)' }}
+              aria-label="Tracking smoothing"
+            />
+          </label>
+          <input
+            value={trackUrl}
+            onChange={(e) => setTrackUrl(e.target.value)}
+            placeholder="ws://host:port"
+            aria-label="Tracking source URL"
+            style={{ width: 130, fontSize: 9, height: 22 }}
+          />
+          <button
+            onClick={() => { if (trackingLinked) disconnectTracking(); else connectTracking(trackUrl); }}
+            title="Connect to an external camera-tracking source (FreeD/mo-sys bridge over WebSocket)"
+            style={{
+              fontSize: 9, height: 22, padding: '0 8px', borderRadius: 3,
+              border: `1px solid ${trackingLinked ? 'var(--status-ok)' : trackingStatus === 'error' ? 'var(--status-error)' : 'var(--border-subtle)'}`,
+              background: trackingLinked ? 'var(--accent-blue-dim)' : 'var(--bg-panel-raised)',
+              color: trackingLinked ? 'var(--status-ok)' : 'var(--text-secondary)',
+            }}
+          >
+            {trackingLabel}
+          </button>
           <IconButton
             label="Safe area guides"
             active={state.showSafeArea}

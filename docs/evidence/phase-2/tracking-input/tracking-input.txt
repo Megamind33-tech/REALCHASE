@@ -1,0 +1,14 @@
+External WebSocket tracking source on ws://localhost:7777
+client connected to server: true
+pose messages sent over the socket: 188
+button label after connect: ● Tracking live
+pose A: {"position":[-6,5.5,-6],"target":[0,1.2,2],"focalLength":35}
+pose B: {"position":[5,1.1,-4.5],"target":[0,1.4,2],"focalLength":50}
+-> 02 vs 03 show the camera at the two EXTERNALLY-commanded poses (real network input drives applyCameraPose).
+
+--- page console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:35:15]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:35:20]: Babylon.js v9.9.1 - WebGL2
