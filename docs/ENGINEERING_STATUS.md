@@ -35,6 +35,8 @@ display-only area pending Milestone 5.
 - ✅ **Scene Composer (M3):** Save/load/recapture named scenes with thumbnails
 - ✅ **Broadcast Graphics (M4):** Lower thirds, ticker, logo bug as real scene overlay
 - ✅ **Timeline (M5):** Real transport (play/pause/stop/step/loop), scrubbable playhead, cues that fire graphics + camera switches live
+- ✅ **Lighting (M6):** Real key/ambient/accent light controls + presets, live in viewport & output
+- ✅ **Materials (M6):** Live base/emissive colour + PBR metallic/roughness editing of the selected object
 - ⚠️ **Source input:** webcam only on this branch — video file / image / screen capture not yet ported (M2 backport outstanding)
 - ⚠️ **Outputs/Audio/Assets modules:** real functionality lives in right-column panels, not standalone module workspaces
 - ❌ **Overlays / Lighting / Cameras / Scripts / Settings:** placeholder screens
@@ -222,6 +224,7 @@ display-only area pending Milestone 5.
 - ~~No broadcast graphics system~~ → **Done (M4):** lower thirds, ticker, logo bug as a real Babylon GUI overlay with play/stop/live-update.
 - ~~No scene/layer composer~~ → **Done (M3):** named scene save/load with transforms + camera + desk + thumbnail.
 - ~~Timeline is display-only~~ → **Done (M5):** real transport + scrubbable playhead; cues fire broadcast graphics and camera switches live. (Transform keyframing remains future work.)
+- ~~No lighting / material controls~~ → **Done (M6):** real key/ambient/accent lighting + presets and live material (colour/emissive/metallic/roughness) editing of the selected object. (Light gizmos, shadows, texture picker remain future work.)
 
 ### Medium Issues
 6. **Video/image file input not implemented.** Only webcam sources work. Video/image file import on switcher would unlock single-file broadcast workflows.

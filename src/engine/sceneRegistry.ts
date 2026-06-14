@@ -43,4 +43,7 @@ export interface DeskSceneRefs {
   deskMaterial: import('@babylonjs/core').StandardMaterial;
   floorMaterial: import('@babylonjs/core').StandardMaterial;
   environmentRoot: import('@babylonjs/core').TransformNode;
+  keyLight: import('@babylonjs/core').DirectionalLight;
+  hemiLight: import('@babylonjs/core').HemisphericLight;
+  accentLights: import('@babylonjs/core').PointLight[];
 }

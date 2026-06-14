@@ -1,12 +1,14 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import {
   LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { Tabs, Slider, Toggle } from '@/components/ui/Controls';
 import { useShell } from '@/context/ShellContext';
 import { useSceneNodes, useImportedAssets, useAssetGroups, useEditorBridge } from '@/context/EditorBridgeContext';
+import { useLighting } from '@/context/LightingContext';
 import type { InspectorSubTab, TransformMode } from '@/context/shellTypes';
 import type { ImportedAsset, AssetGroup } from '@/integrations/render-engine/types';
+import { LIGHTING_PRESETS, type LightChannel, type LightingSettings } from '@/engine/lighting';
 import { formatBytes } from '@/integrations/render-engine/assetImport';
 import { TIMELINE_LAYERS } from '@/data/mock/studioData';
 
@@ -193,13 +195,13 @@ export function Inspector() {
               </>
             )}
 
-            {state.inspectorSubTab === 'light' && <NotWired feature="Studio lighting controls" />}
+            {state.inspectorSubTab === 'light' && <LightingControls />}
 
             {state.inspectorSubTab === 'presenter' && <NotWired feature="Presenter / talent adjustments" />}
 
             {state.inspectorSubTab === 'keying' && <NotWired feature="Chroma keying" />}
 
-            {state.inspectorSubTab === 'materials' && <NotWired feature="Material editing" />}
+            {state.inspectorSubTab === 'materials' && <MaterialControls selectedObjectId={state.selectedObjectId} />}
           </div>
         </>
       ) : (
@@ -412,6 +414,96 @@ function GroupInspector({ group, transformMode, onTransformMode }: {
       <Vec3Row label="Position" values={t.position} onChange={(v) => setAssetTransform(group.id, { position: v })} />
       <Vec3Row label="Rotation" unit="°" values={rotDeg} onChange={(v) => setAssetTransform(group.id, { rotation: [v[0] / DEG, v[1] / DEG, v[2] / DEG] })} />
       <Vec3Row label="Scale" values={t.scaling} onChange={(v) => setAssetTransform(group.id, { scaling: v })} />
+    </div>
+  );
+}
+
+function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 6 }}>
+      <span>{label}</span>
+      <input type="color" value={value} onChange={(e) => onChange(e.currentTarget.value)} style={{ width: 40, height: 22, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label={label} />
+    </label>
+  );
+}
+
+function LightingControls() {
+  const { lighting, setLighting, applyPreset, activePreset } = useLighting();
+  const setChannel = (key: keyof LightingSettings, patch: Partial<LightChannel>) =>
+    setLighting({ ...lighting, [key]: { ...lighting[key], ...patch } });
+
+  const Channel = ({ id, label }: { id: keyof LightingSettings; label: string }) => (
+    <div style={{ marginBottom: 10 }}>
+      <div className="section-label" style={{ marginBottom: 4 }}>{label}</div>
+      <Slider label="Intensity" value={Math.round(lighting[id].intensity * 100)} min={0} max={300} unit="%" onChange={(v) => setChannel(id, { intensity: v / 100 })} />
+      <ColorRow label="Colour" value={lighting[id].color} onChange={(v) => setChannel(id, { color: v })} />
+    </div>
+  );
+
+  return (
+    <div data-testid="lighting-controls">
+      <div className="section-label" style={{ marginBottom: 6 }}>Lighting Presets</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 12 }}>
+        {Object.keys(LIGHTING_PRESETS).map((name) => (
+          <button
+            key={name}
+            onClick={() => applyPreset(LIGHTING_PRESETS[name], name)}
+            style={{
+              padding: 6, fontSize: 10, borderRadius: 3,
+              border: `1px solid ${activePreset === name ? 'var(--accent-blue)' : 'var(--border-subtle)'}`,
+              background: activePreset === name ? 'var(--accent-blue-dim)' : 'var(--bg-panel-raised)',
+              color: activePreset === name ? 'var(--accent-blue)' : 'var(--text-secondary)',
+            }}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <Channel id="key" label="Key Light" />
+      <Channel id="ambient" label="Ambient" />
+      <Channel id="accent" label="Accent / Pillars" />
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+        Drives the real scene lights — changes are visible in the viewport and captured output.
+      </div>
+    </div>
+  );
+}
+
+function MaterialControls({ selectedObjectId }: { selectedObjectId: string }) {
+  const { getSelectedMaterial, setSelectedMaterial } = useEditorBridge();
+  // Seed local state from the engine; re-read when the selection changes so the
+  // controls reflect the actual material and don't snap back while dragging.
+  const [info, setInfo] = useState(() => getSelectedMaterial());
+  useEffect(() => { setInfo(getSelectedMaterial()); }, [selectedObjectId, getSelectedMaterial]);
+
+  const apply = (patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }) => {
+    setSelectedMaterial(patch);
+    setInfo((prev) => ({ ...prev, ...patch }));
+  };
+
+  if (!info.hasMaterial) {
+    return (
+      <div style={{ border: '1px dashed var(--border-active)', borderRadius: 4, padding: 12, fontSize: 10, lineHeight: 1.5, color: 'var(--text-muted)' }}>
+        <strong style={{ color: 'var(--text-secondary)' }}>{selectedObjectId}</strong> has no editable material.
+        <br />Select a mesh (desk, pillars, an imported model) to edit its colour and surface.
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="material-controls">
+      <div className="section-label" style={{ marginBottom: 6 }}>Material · {info.kind.toUpperCase()}</div>
+      <ColorRow label="Base colour" value={info.color} onChange={(v) => apply({ color: v })} />
+      <ColorRow label="Emissive" value={info.emissive} onChange={(v) => apply({ emissive: v })} />
+      {info.kind === 'pbr' && (
+        <>
+          <Slider label="Metallic" value={Math.round((info.metallic ?? 0) * 100)} min={0} max={100} unit="%" onChange={(v) => apply({ metallic: v / 100 })} />
+          <Slider label="Roughness" value={Math.round((info.roughness ?? 1) * 100)} min={0} max={100} unit="%" onChange={(v) => apply({ roughness: v / 100 })} />
+        </>
+      )}
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 4 }}>
+        Edits apply live to the selected object&apos;s {info.kind === 'pbr' ? 'PBR' : 'standard'} material.
+      </div>
     </div>
   );
 }

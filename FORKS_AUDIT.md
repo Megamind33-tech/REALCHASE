@@ -53,3 +53,19 @@ This document lists all audited open-source forks and sources collected for the 
   transforms + active camera + desk look and a render-target thumbnail; restores them
   with honest partial-restore reporting. No external fork required. The `Sofie-*`
   (MIT) automation repos remain the reference for future rundown/timeline playout.
+
+### Timeline (Milestone 5)
+
+- Native implementation; no external fork. The cue + play/stop/update model is
+  consistent with the `Sofie-*` (MIT) automation paradigm, which remains the reference
+  for a future full rundown/playout system. No Sofie code is used. The timeline drives
+  the real graphics overlay (M4) and camera state.
+
+### Studio Lighting & Materials (Milestone 6)
+
+- Implemented entirely on **Babylon.js core** (Apache-2.0): a key `DirectionalLight`,
+  the ambient `HemisphericLight`, and accent `PointLight`s, plus live editing of the
+  selected mesh's `StandardMaterial` / `PBRMaterial`. **google/filament** (Apache-2.0)
+  is retained only as a *look/PBR reference* — no Filament code is compiled or linked;
+  CHASE renders through Babylon. Lighting presets follow conventional broadcast looks
+  (original values). No GPL dependency is involved.

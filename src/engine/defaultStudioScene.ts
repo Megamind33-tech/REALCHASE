@@ -2,6 +2,7 @@ import {
   ArcRotateCamera,
   Color3,
   Color4,
+  DirectionalLight,
   DynamicTexture,
   Engine,
   HemisphericLight,
@@ -94,6 +95,7 @@ export function buildDefaultStudioScene(scene: Scene): DefaultSceneResult {
   // Pillar lights
   const pillarRoot = new TransformNode('pillarLights', scene);
   pillarRoot.parent = environmentRoot;
+  const accentLights: PointLight[] = [];
   [-3.5, 3.5].forEach((x) => {
     const pillar = MeshBuilder.CreateCylinder('pillar', { height: 4, diameter: 0.25 }, scene);
     pillar.parent = pillarRoot;
@@ -105,8 +107,15 @@ export function buildDefaultStudioScene(scene: Scene): DefaultSceneResult {
     const pl = new PointLight(`pillarLight_${x}`, new Vector3(x, 3.5, 5), scene);
     pl.intensity = 0.8;
     pl.diffuse = new Color3(0.7, 0.75, 1);
+    accentLights.push(pl);
   });
   pillarRoot.metadata = { chaseId: 'lights', displayName: 'Pillar Lights' };
+
+  // Key light — the main directional studio light (gives form/shadowing).
+  const keyLight = new DirectionalLight('keyLight', new Vector3(-0.4, -1, 0.3), scene);
+  keyLight.position = new Vector3(4, 9, -3);
+  keyLight.intensity = 1.0;
+  keyLight.diffuse = new Color3(1, 0.96, 0.9);
 
   // Decor plant
   const plantPot = MeshBuilder.CreateCylinder('plantPot', { height: 0.5, diameter: 0.4 }, scene);
@@ -165,6 +174,9 @@ export function buildDefaultStudioScene(scene: Scene): DefaultSceneResult {
       deskMaterial: deskMat,
       floorMaterial: floorMat,
       environmentRoot,
+      keyLight,
+      hemiLight: hemi,
+      accentLights,
     },
     cameras,
   };

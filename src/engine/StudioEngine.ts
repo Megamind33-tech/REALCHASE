@@ -11,6 +11,7 @@ import {
   Mesh,
   MeshBuilder,
   ImportMeshAsync,
+  PBRMaterial,
   type Observer,
   PointerEventTypes,
   RawTexture,
@@ -52,6 +53,7 @@ import {
 import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
+import { DEFAULT_LIGHTING, hexToRgb, rgbToHex, type LightingSettings } from './lighting';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -274,6 +276,7 @@ export class StudioEngine {
     this.setupPicking();
     this.selectObject('desk');
     this.applyQuality(this.qualityMode);
+    this.applyLighting(this.lighting);
     this.attachActiveCameraControls();
     this.resizeObserver = bindEngineResize(this.engine, canvas);
 
@@ -1471,6 +1474,71 @@ export class StudioEngine {
   updateGraphic(item: GraphicItem) { this.graphics?.update(item); }
   isGraphicOn(id: string): boolean { return this.graphics?.isOn(id) ?? false; }
   clearGraphics() { this.graphics?.clear(); }
+
+  // ---- Studio lighting (real Babylon lights) ----
+  private lighting: LightingSettings = DEFAULT_LIGHTING;
+
+  applyLighting(settings: LightingSettings) {
+    this.lighting = settings;
+    if (!this.refs) return;
+    const [kr, kg, kb] = hexToRgb(settings.key.color);
+    this.refs.keyLight.intensity = settings.key.intensity;
+    this.refs.keyLight.diffuse = new Color3(kr, kg, kb);
+
+    const [ar, ag, ab] = hexToRgb(settings.ambient.color);
+    this.refs.hemiLight.intensity = settings.ambient.intensity;
+    this.refs.hemiLight.diffuse = new Color3(ar, ag, ab);
+
+    const [cr, cg, cb] = hexToRgb(settings.accent.color);
+    this.refs.accentLights.forEach((l) => {
+      l.intensity = settings.accent.intensity;
+      l.diffuse = new Color3(cr, cg, cb);
+    });
+  }
+
+  getLighting(): LightingSettings {
+    return this.lighting;
+  }
+
+  // ---- Material editing for the selected object ----
+  getSelectedMaterial(): {
+    hasMaterial: boolean; kind: 'standard' | 'pbr' | 'none';
+    color: string; emissive: string; metallic: number | null; roughness: number | null;
+  } {
+    const none = { hasMaterial: false, kind: 'none' as const, color: '#808080', emissive: '#000000', metallic: null, roughness: null };
+    const target = this.findMeshById(this.selectedId ?? '');
+    if (!(target instanceof Mesh) || !target.material) return none;
+    const mat = target.material;
+    if (mat instanceof PBRMaterial) {
+      const a = mat.albedoColor, e = mat.emissiveColor;
+      return { hasMaterial: true, kind: 'pbr', color: rgbToHex(a.r, a.g, a.b), emissive: rgbToHex(e.r, e.g, e.b), metallic: mat.metallic ?? 0, roughness: mat.roughness ?? 1 };
+    }
+    if (mat instanceof StandardMaterial) {
+      const d = mat.diffuseColor, e = mat.emissiveColor;
+      return { hasMaterial: true, kind: 'standard', color: rgbToHex(d.r, d.g, d.b), emissive: rgbToHex(e.r, e.g, e.b), metallic: null, roughness: null };
+    }
+    return none;
+  }
+
+  setSelectedMaterial(patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }): boolean {
+    const target = this.findMeshById(this.selectedId ?? '');
+    if (!(target instanceof Mesh) || !target.material) return false;
+    const mat = target.material;
+    mat.unfreeze();
+    if (mat instanceof PBRMaterial) {
+      if (patch.color) { const [r, g, b] = hexToRgb(patch.color); mat.albedoColor = new Color3(r, g, b); }
+      if (patch.emissive) { const [r, g, b] = hexToRgb(patch.emissive); mat.emissiveColor = new Color3(r, g, b); }
+      if (patch.metallic !== undefined) mat.metallic = patch.metallic;
+      if (patch.roughness !== undefined) mat.roughness = patch.roughness;
+      return true;
+    }
+    if (mat instanceof StandardMaterial) {
+      if (patch.color) { const [r, g, b] = hexToRgb(patch.color); mat.diffuseColor = new Color3(r, g, b); }
+      if (patch.emissive) { const [r, g, b] = hexToRgb(patch.emissive); mat.emissiveColor = new Color3(r, g, b); }
+      return true;
+    }
+    return false;
+  }
 
   // ---- Scene composer (capture/restore node transforms + camera) ----
   /** The id of the currently active 3D camera. */

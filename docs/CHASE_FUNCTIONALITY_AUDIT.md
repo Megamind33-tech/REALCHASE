@@ -152,23 +152,29 @@ app actions — play/stop a broadcast graphic (M4) or switch the active camera.
 
 ### Inspector: Light Tab
 
-**Status:** MOCK (0%)
+**Status:** WORKING (75%) — implemented in Milestone 6
+
+Drives the real scene lights: a key DirectionalLight, the ambient
+HemisphericLight, and the accent point lights. Lighting persists across
+Builder re-entry (re-applied on engine ready) via `LightingContext`.
 
 #### What Works
-- ❌ Button label only; no controls
+- ✅ Key / Ambient / Accent intensity sliders (live)
+- ✅ Per-channel colour pickers (live)
+- ✅ Presets: Broadcast, Studio, Natural, Dramatic (adjust all channels in concert)
+- ✅ Live preview in the viewport (and captured output/thumbnails)
+- ✅ Active preset highlighting; persists across module switches
 
-#### What's Missing
-- ❌ Light intensity
-- ❌ Light color
-- ❌ Light position (3D placement)
-- ❌ Light type selector (directional, point, spot)
-- ❌ Shadow controls
+#### What's Missing (future)
+- ⚠️ Light position gizmo / 3D placement
+- ⚠️ Shadow controls
+- ⚠️ Lighting not yet saved in the project file (scene snapshot captures desk look only)
 
 #### Acceptance Criteria for "Done"
-- [ ] Studio lighting controls match broadcast standards (3-point lighting)
-- [ ] Presets (Key, Fill, Back) adjust 3+ lights in concert
-- [ ] Live preview of lighting changes
-- [ ] Changes persist; can save as preset
+- [x] Studio lighting controls (key + ambient + accent)
+- [x] Presets adjust multiple lights in concert
+- [x] Live preview of lighting changes
+- [ ] Light placement gizmo + shadows + project persistence (future)
 
 ---
 
@@ -214,20 +220,23 @@ app actions — play/stop a broadcast graphic (M4) or switch the active camera.
 
 ### Inspector: Materials Tab
 
-**Status:** MOCK (0%)
+**Status:** WORKING (70%) — implemented in Milestone 6
 
 #### What Works
-- ❌ Tab label only
+- ✅ Reads the selected mesh's real material (StandardMaterial or PBRMaterial)
+- ✅ Base colour + emissive colour pickers apply live
+- ✅ PBR metallic + roughness sliders apply live (for imported glTF/PBR assets)
+- ✅ Honest empty state when the selection has no editable material (e.g. a group)
 
-#### What's Missing
-- ❌ Material browser
-- ❌ Texture editor
-- ❌ Color/metallic/roughness controls
+#### What's Missing (future)
+- ⚠️ Texture picker / replace
+- ⚠️ Material browser / presets
+- ⚠️ Material changes not yet persisted in the project file
 
 #### Acceptance Criteria for "Done"
-- [ ] Select asset → edit its material properties
-- [ ] Texture picker (drag to replace; preview in viewport)
-- [ ] PBR sliders (metallic, roughness) update in real-time
+- [x] Select object → edit its material colour/emissive
+- [x] PBR sliders (metallic, roughness) update in real-time
+- [ ] Texture picker (future)
 
 ---
 

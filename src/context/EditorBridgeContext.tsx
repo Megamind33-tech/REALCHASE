@@ -12,7 +12,13 @@ import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
+import type { LightingSettings } from '@/engine/lighting';
 import { useShell } from './ShellContext';
+
+type MaterialInfo = {
+  hasMaterial: boolean; kind: 'standard' | 'pbr' | 'none';
+  color: string; emissive: string; metallic: number | null; roughness: number | null;
+};
 
 interface EditorBridgeValue {
   engine: StudioEngine | null;
@@ -52,6 +58,10 @@ interface EditorBridgeValue {
   applyNodeTransforms: (nodes: NodeTransform[]) => { restored: number; missing: number };
   captureSceneThumbnail: (width?: number) => Promise<string>;
   getActiveCameraId: () => string;
+  applyLighting: (settings: LightingSettings) => void;
+  getLighting: () => LightingSettings | null;
+  getSelectedMaterial: () => MaterialInfo;
+  setSelectedMaterial: (patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }) => boolean;
   assets: ImportedAsset[];
   groups: AssetGroup[];
   sceneNodes: SceneNodeInfo[];
@@ -284,6 +294,11 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const captureSceneThumbnail = useCallback((width?: number) => engineRef.current?.captureSceneThumbnail(width) ?? Promise.resolve(''), []);
   const getActiveCameraId = useCallback(() => engineRef.current?.getActiveCameraId() ?? 'cam1', []);
 
+  const applyLighting = useCallback((settings: LightingSettings) => { engineRef.current?.applyLighting(settings); }, []);
+  const getLighting = useCallback(() => engineRef.current?.getLighting() ?? null, []);
+  const getSelectedMaterial = useCallback((): MaterialInfo => engineRef.current?.getSelectedMaterial() ?? { hasMaterial: false, kind: 'none', color: '#808080', emissive: '#000000', metallic: null, roughness: null }, []);
+  const setSelectedMaterial = useCallback((patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }) => engineRef.current?.setSelectedMaterial(patch) ?? false, []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -324,6 +339,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         applyNodeTransforms,
         captureSceneThumbnail,
         getActiveCameraId,
+        applyLighting,
+        getLighting,
+        getSelectedMaterial,
+        setSelectedMaterial,
         assets,
         groups,
         sceneNodes,
