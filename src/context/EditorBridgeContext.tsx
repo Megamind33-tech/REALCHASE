@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { StudioEngine, type TrackingStatus } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
+import type { ImportedAsset, SerializedAsset, AssetTransform } from '@/integrations/render-engine/types';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -27,6 +28,12 @@ interface EditorBridgeValue {
   addObject: (objectId: string) => boolean;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
   importGltfFiles: (files: File[]) => Promise<number>;
+  importAsset: (file: File) => Promise<ImportedAsset>;
+  setAssetTransform: (id: string, transform: Partial<AssetTransform>) => void;
+  removeAsset: (id: string) => void;
+  serializeAssets: () => SerializedAsset[];
+  restoreAssets: (assets: SerializedAsset[]) => Promise<{ restored: number; skipped: number }>;
+  assets: ImportedAsset[];
   sceneNodes: SceneNodeInfo[];
 }
 
@@ -44,6 +51,7 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const engineRef = useRef<StudioEngine | null>(null);
   const [engine, setEngine] = useState<StudioEngine | null>(null);
   const [sceneNodes, setSceneNodes] = useState<SceneNodeInfo[]>([]);
+  const [assets, setAssets] = useState<ImportedAsset[]>([]);
   const [trackingStatus, setTrackingStatus] = useState<TrackingStatus | 'idle'>('idle');
   const { state, dispatch } = useShell();
 
@@ -77,6 +85,12 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'tracking') {
         setTrackingStatus(event.status);
+      }
+      if (event.type === 'assets') {
+        setAssets(event.assets);
+      }
+      if (event.type === 'asset-warning') {
+        dispatch({ type: 'SHOW_TOAST', message: event.message });
       }
     });
     instance.init(canvas);
@@ -164,6 +178,28 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
     return engine.importGltfFiles(files);
   }, []);
 
+  const importAsset = useCallback((file: File) => {
+    const engine = engineRef.current;
+    if (!engine) return Promise.reject(new Error('Scene is not ready'));
+    return engine.importAsset(file);
+  }, []);
+
+  const setAssetTransform = useCallback((id: string, transform: Partial<AssetTransform>) => {
+    engineRef.current?.setAssetTransform(id, transform);
+  }, []);
+
+  const removeAsset = useCallback((id: string) => {
+    engineRef.current?.removeAsset(id);
+  }, []);
+
+  const serializeAssets = useCallback(() => engineRef.current?.serializeAssets() ?? [], []);
+
+  const restoreAssets = useCallback((list: SerializedAsset[]) => {
+    const engine = engineRef.current;
+    if (!engine) return Promise.resolve({ restored: 0, skipped: 0 });
+    return engine.restoreAssets(list);
+  }, []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -182,6 +218,12 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         addObject,
         loadPack,
         importGltfFiles,
+        importAsset,
+        setAssetTransform,
+        removeAsset,
+        serializeAssets,
+        restoreAssets,
+        assets,
         sceneNodes,
       }}
     >
@@ -198,4 +240,8 @@ export function useEditorBridge() {
 
 export function useSceneNodes() {
   return useEditorBridge().sceneNodes;
+}
+
+export function useImportedAssets() {
+  return useEditorBridge().assets;
 }

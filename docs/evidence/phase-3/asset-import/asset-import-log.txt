@@ -1,0 +1,18 @@
+fixture: /home/user/REALCHASE/tests/fixtures/chase-test-cube.glb (952 bytes, GLB magic glTF)
+01-import-panel.png captured
+unsupported import -> "Unsupported file "notes.txt". Import a .glb or .gltf model."
+corrupt import -> "Not a valid GLB (missing glTF binary header)."
+failure states honest & precise: true
+assets after rejected imports (must be 0): 0
+imported asset inspector: chase-test-cube | Type | GLB model | File size | 952 B | Meshes | 1 | Vertices | 8 | Move | Rotate | Scale | Position | Rotation | ° | Scale
+transform after import: pos=(0, 0, 0) rotY=180 scaleX=1
+02-asset-on-stage.png captured (asset lifted + scaled onto the stage)
+transform after edit: posY=1.6 rotY=35 scaleX=1.6
+03-transform-controls.png captured
+saved project: 1 asset(s); embedded=true; bytes=952; transform={"position":[0,1.6,0],"rotation":[0,0.6108652381980153,0],"scaling":[1.6,1.6,1.6]}
+assets in scene immediately after reload (before reopen): 0
+restored asset inspector: chase-test-cube | Type | GLB model | File size | 952 B | Meshes | 1 | Vertices | 8 | Move | Rotate | Scale | Position | Rotation | ° | Scale
+restored transform: posY=1.6 rotY=35 scaleX=1.6
+04-reloaded-scene.png captured
+
+-> PASS: the imported GLB was placed, transformed, saved, reloaded, and restored with its exact placement.
