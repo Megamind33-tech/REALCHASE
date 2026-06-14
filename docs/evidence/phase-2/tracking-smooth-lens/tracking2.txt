@@ -1,0 +1,13 @@
+lens match: focal 24mm (wide) vs 85mm (tele) -> see 01/02 (FOV change). focal slider hit: true
+
+smoothing jitter proxy (mean per-pixel abs change (0..255) between consecutive viewport frames, 6-frame run):
+  smoothing 0    (raw noisy signal): 11.0102
+  smoothing 0.95 (low-pass):         6.6947
+  -> lower with smoothing means the low-pass rejects the tracking jitter.
+
+--- console ---
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[log] BJS - [02:21:55]: Babylon.js v9.9.1 - WebGL2
+[log] BJS - [02:22:01]: Babylon.js v9.9.1 - WebGL2

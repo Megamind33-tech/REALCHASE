@@ -20,8 +20,9 @@ const TRANSFORM_MODES: { id: TransformMode; icon: typeof Box; label: string }[] 
 
 export function Viewport() {
   const { state, dispatch } = useShell();
-  const { engine, setCameraTracking } = useEditorBridge();
+  const { engine, setCameraTracking, setTrackingSmoothing } = useEditorBridge();
   const [tracking, setTracking] = useState(false);
+  const [smoothing, setSmoothing] = useState(0.4);
 
   if (state.activeModule === 'switcher') {
     return <SwitcherPanel />;
@@ -119,6 +120,21 @@ export function Viewport() {
           >
             <Crosshair size={14} />
           </IconButton>
+          {tracking && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text-secondary)' }} title="Tracking smoothing (jitter rejection)">
+              Smooth
+              <input
+                type="range"
+                min={0}
+                max={0.97}
+                step={0.01}
+                value={smoothing}
+                onChange={(e) => { const v = Number(e.target.value); setSmoothing(v); setTrackingSmoothing(v); }}
+                style={{ width: 70, accentColor: 'var(--accent-blue)' }}
+                aria-label="Tracking smoothing"
+              />
+            </label>
+          )}
           <IconButton
             label="Safe area guides"
             active={state.showSafeArea}
