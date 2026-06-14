@@ -12,7 +12,8 @@
     "tauri:build": "tauri build",
     "setup:editor-fork": "powershell -ExecutionPolicy Bypass -File scripts/clone-editor-fork.ps1",
     "test:anti-demo": "node tests/anti-demo-smoke.mjs",
-    "test:visual-smoke": "node tests/browser-visual-smoke.mjs"
+    "test:visual-smoke": "node tests/browser-visual-smoke.mjs",
+    "test:freed": "node --experimental-strip-types tests/freed.test.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.9.1",

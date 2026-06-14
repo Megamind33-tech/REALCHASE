@@ -35,6 +35,7 @@ import {
   focalLengthToFov,
 } from './defaultStudioScene';
 import { QUALITY_PROFILES } from './qualityProfile';
+import { decodeFreeD, type FreeDPose } from './freed';
 import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sceneRegistry';
 import { LAYER_TO_OBJECT } from './sceneRegistry';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
@@ -163,6 +164,8 @@ export class StudioEngine {
   private trackingSmoothing = 0.4;
   private smoothTarget = new Vector3(0, 1.4, 2);
   private trackingSocket: WebSocket | null = null;
+  // FreeD calibration: studio position scale/offset + zoom→focal range.
+  private trackingCalibration = { posScale: 1, posOffset: new Vector3(0, 0, 0), focalMin: 14, focalMax: 200 };
   private viewportMode: '3d' | '2d' = '3d';
   private deskProps: DeskProperties | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -492,6 +495,32 @@ export class StudioEngine {
     this.trackingSmoothing = Math.min(0.97, Math.max(0, amount));
   }
 
+  /** FreeD studio calibration (position scale/offset + zoom→focal range). */
+  setTrackingCalibration(cal: { posScale?: number; posOffset?: [number, number, number]; focalMin?: number; focalMax?: number }) {
+    if (typeof cal.posScale === 'number') this.trackingCalibration.posScale = cal.posScale;
+    if (cal.posOffset) this.trackingCalibration.posOffset = new Vector3(cal.posOffset[0], cal.posOffset[1], cal.posOffset[2]);
+    if (typeof cal.focalMin === 'number') this.trackingCalibration.focalMin = cal.focalMin;
+    if (typeof cal.focalMax === 'number') this.trackingCalibration.focalMax = cal.focalMax;
+  }
+
+  /** Map a decoded FreeD pose (position + pan/tilt orientation + zoom) into the
+   * virtual camera, applying studio calibration. */
+  private applyFreeDPose(p: FreeDPose) {
+    const cal = this.trackingCalibration;
+    const pos = new Vector3(
+      p.x * cal.posScale + cal.posOffset.x,
+      p.y * cal.posScale + cal.posOffset.y,
+      p.z * cal.posScale + cal.posOffset.z,
+    );
+    const pan = (p.pan * Math.PI) / 180;
+    const tilt = (p.tilt * Math.PI) / 180;
+    const fwd = new Vector3(Math.sin(pan) * Math.cos(tilt), Math.sin(tilt), Math.cos(pan) * Math.cos(tilt));
+    const target = pos.add(fwd.scale(3));
+    const focal = cal.focalMin + (p.zoom / 0xffffff) * (cal.focalMax - cal.focalMin);
+    this.applyCameraPose(pos, target, focalLengthToFov(focal));
+    this.markInteraction();
+  }
+
   /**
    * Enable a tracked virtual camera. With no real tracking hardware attached we
    * feed a clearly-labelled synthetic TEST SIGNAL (a gentle jib/handheld move) so
@@ -532,6 +561,7 @@ export class StudioEngine {
       return;
     }
     this.trackingSocket = socket;
+    socket.binaryType = 'arraybuffer'; // receive raw FreeD packets as bytes
     socket.onopen = () => {
       // Real data drives the camera — drop the synthetic test signal if running.
       if (this.trackingObserver && this.scene) {
@@ -543,6 +573,13 @@ export class StudioEngine {
     };
     socket.onmessage = (ev) => {
       try {
+        // Binary frame → FreeD (industry standard, forwarded by a UDP→WS bridge).
+        if (ev.data instanceof ArrayBuffer) {
+          const freed = decodeFreeD(new Uint8Array(ev.data));
+          if (freed) this.applyFreeDPose(freed);
+          return;
+        }
+        // Text frame → simple JSON pose.
         const p = JSON.parse(typeof ev.data === 'string' ? ev.data : '') as {
           position?: number[]; target?: number[]; fov?: number; focalLength?: number;
         };
