@@ -23,3 +23,27 @@ This document lists all audited open-source forks and sources collected for the 
 - **Permissive Licences (Apache-2.0 / MIT)**: `BabylonJS/Editor`, `BabylonJS/Babylon.js`, `playcanvas/engine`, `filament`, `mediamtx`, `restreamer`, and `Sofie-Automation` repositories are under MIT or Apache 2.0. They are safe to fork, modify, and integrate directly into the CHASE proprietary application structure.
 - **Lesser Copyleft (LGPL-2.1)**: `gstreamer` is licensed under LGPL-2.1. It is safe to use as a dynamically linked dependency (via system packages or precompiled bindings) but its source code should not be statically linked or merged directly into proprietary CHASE modules to avoid licensing complications.
 - **Strong Copyleft (GPL-2.0 / GPL-3.0)**: `CasparCG/server` and `obs-studio` are under GPL. They **must remain external processes**. Under no circumstances should any GPL code be copy-pasted or linked directly into proprietary modules of CHASE PRO. They must only be controlled via IPC (Inter-Process Communication) or networking protocols (e.g. WebSocket, OSC, TCP).
+
+## Integration Decisions Log
+
+### Milestone 4 — Broadcast Graphics (lower thirds, ticker, logo bug)
+
+- **Reference fork:** `CasparCG/server` is the industry-standard broadcast CG/playout
+  engine and is the design reference for our graphics model. Because it is **GPL-3.0**,
+  no CasparCG code is copied or linked. We adopt only its well-established *paradigm*:
+  CG **template items** with a **play / stop / update** lifecycle, **layered z-order**,
+  and the standard graphic primitives (lower third / crawl / logo bug). This keeps the
+  feature aligned with real broadcast tooling rather than being a generic placeholder.
+- **Implementation runtime:** Graphics are rendered natively with **`@babylonjs/gui`
+  9.9.1** (Apache-2.0, already a dependency) as a fullscreen `AdvancedDynamicTexture`
+  overlay attached to the live scene. This means on-air graphics are part of the actual
+  rendered frame — they show up in captured thumbnails and in any output stream, not as
+  a separate DOM mock.
+  - `src/graphics/BroadcastGraphics.ts` — GUI overlay + real frame-delta-driven
+    in/out animation and ticker scroll.
+  - `src/graphics/graphicsTypes.ts` — CG item model (CasparCG-aligned, original code).
+- **Future external option:** When a CasparCG *server* is available, the same
+  `GraphicItem` model can be driven over AMCP/OSC to an external CasparCG process for
+  hardware-grade playout — preserving the GPL boundary (control via protocol only).
+- **No mockups:** The Graphics module performs real play/stop/update against the engine;
+  there are no disabled "coming soon" controls in this workspace.

@@ -7,6 +7,7 @@ import { Timeline } from './Timeline';
 import { Inspector, InspectorExpandHandle } from './Inspector';
 import { OutputPanel } from './OutputPanel';
 import { StatusBar } from './StatusBar';
+import { GraphicsSync } from './GraphicsSync';
 
 export function AppShell() {
   return (
@@ -47,6 +48,7 @@ export function AppShell() {
       </div>
 
       <StatusBar />
+      <GraphicsSync />
     </div>
   );
 }

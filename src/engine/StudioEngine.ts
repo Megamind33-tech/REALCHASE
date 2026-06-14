@@ -26,6 +26,8 @@ import {
 import { QUALITY_PROFILES } from './qualityProfile';
 import type { CameraId, DeskSceneRefs, SceneNodeInfo, TransformMode } from './sceneRegistry';
 import { LAYER_TO_OBJECT } from './sceneRegistry';
+import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
+import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { DeskProperties, QualityMode } from '@/context/shellTypes';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
@@ -55,6 +57,7 @@ export class StudioEngine {
   private canvas: HTMLCanvasElement | null = null;
   private disposed = false;
   private packNodes: Array<AbstractMesh | TransformNode> = [];
+  private graphics: BroadcastGraphics | null = null;
 
   init(canvas: HTMLCanvasElement) {
     if (this.engine) return;
@@ -77,6 +80,10 @@ export class StudioEngine {
     this.gizmoManager.positionGizmoEnabled = true;
     this.gizmoManager.rotationGizmoEnabled = false;
     this.gizmoManager.scaleGizmoEnabled = false;
+
+    // Real broadcast graphics overlay rendered ON the scene (so it appears in
+    // captured thumbnails / output, not just the DOM).
+    this.graphics = new BroadcastGraphics(this.scene);
 
     this.setupPicking();
     this.selectObject('desk');
@@ -395,6 +402,27 @@ export class StudioEngine {
     return true;
   }
 
+  /** Broadcast graphics — CG play/stop/update against the live overlay. */
+  playGraphic(item: GraphicItem) {
+    this.graphics?.play(item);
+  }
+
+  stopGraphic(id: string) {
+    this.graphics?.stop(id);
+  }
+
+  updateGraphic(item: GraphicItem) {
+    this.graphics?.update(item);
+  }
+
+  isGraphicOn(id: string): boolean {
+    return this.graphics?.isOn(id) ?? false;
+  }
+
+  clearGraphics() {
+    this.graphics?.clear();
+  }
+
   /** The id of the currently active 3D camera. */
   getActiveCameraId(): CameraId {
     return this.activeCameraId;
@@ -513,6 +541,8 @@ export class StudioEngine {
   dispose() {
     this.disposed = true;
     this.resizeObserver?.disconnect();
+    this.graphics?.dispose();
+    this.graphics = null;
     this.gizmoManager?.dispose();
     this.scene?.dispose();
     this.engine?.dispose();

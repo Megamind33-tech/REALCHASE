@@ -2,6 +2,7 @@ import { ShellProvider } from '@/context/ShellContext';
 import { EditorBridgeProvider } from '@/context/EditorBridgeContext';
 import { SourcesProvider } from '@/context/SourcesContext';
 import { ScenesProvider } from '@/context/ScenesContext';
+import { GraphicsProvider } from '@/context/GraphicsContext';
 import { AppShell } from '@/components/shell/AppShell';
 
 export default function App() {
@@ -10,7 +11,9 @@ export default function App() {
       <EditorBridgeProvider>
         <SourcesProvider>
           <ScenesProvider>
-            <AppShell />
+            <GraphicsProvider>
+              <AppShell />
+            </GraphicsProvider>
           </ScenesProvider>
         </SourcesProvider>
       </EditorBridgeProvider>

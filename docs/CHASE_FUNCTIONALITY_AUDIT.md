@@ -356,25 +356,36 @@ Real asset management exists in **builder → AssetPanel** (left sidebar). This 
 
 ## MODULE: GRAPHICS
 
-**Status:** MOCK (0%)
+**Status:** WORKING (85%) — implemented in Milestone 4
 
-#### What's Missing
-- ❌ Graphics template browser
-- ❌ Lower third designer (name straps)
-- ❌ Ticker/headline editor
-- ❌ Logo bug placement/animation
-- ❌ Watermark editor
-- ❌ Broadcast graphics library
-- ❌ Graphics preview in Program monitor
-- ❌ Graphics on/off toggle
+Built on `@babylonjs/gui` as a real fullscreen overlay on the live scene
+(CasparCG CG paradigm: template item + play/stop/update + layered z-order).
+GPL CasparCG referenced as design model only; no GPL code used.
+
+#### What Works
+- ✅ Add lower third, ticker, logo bug (real CG templates)
+- ✅ Lower third: title + subtitle, slide-up + fade-in animation, accent bar
+- ✅ Ticker: scrolling headline crawl with configurable speed, LIVE flag
+- ✅ Logo bug: corner placement (TL/TR/BL/BR), opacity, fade-in
+- ✅ Play On Air / Take Off Air per graphic (real play/stop with in/out anim)
+- ✅ Live CG UPDATE — editing an on-air graphic updates it in real time
+- ✅ Renders into the actual scene frame (visible in thumbnails + output)
+- ✅ On-air state survives module switches (GraphicsSync replays onto fresh engine)
+- ✅ Accent color, animation duration controls
+- ✅ No disabled/"coming soon" controls
+
+#### What's Missing (future polish)
+- ⚠️ Graphics not yet persisted in project file (M5/M7 follow-up)
+- ⚠️ Image-based logo (text-based bug only for now)
+- ⚠️ Template library / presets
 
 #### Acceptance Criteria for "Done"
-- [ ] Lower third template: name + title + 3s animation
-- [ ] Ticker: scrolling headline text; configurable speed/duration
-- [ ] Logo bug: corner placement, opacity, scale
-- [ ] Graphics render as Babylon overlay layer (not DOM)
-- [ ] Graphics preview in real-time on Program source
-- [ ] Graphics data stored in project; persist across sessions
+- [x] Lower third template: title + subtitle + animated in/out
+- [x] Ticker: scrolling headline text; configurable speed
+- [x] Logo bug: corner placement, opacity
+- [x] Graphics render as Babylon GUI overlay (not DOM)
+- [x] Graphics play/stop on air; live update
+- [ ] Graphics data stored in project; persist across sessions (future)
 
 ---
 

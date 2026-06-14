@@ -10,6 +10,7 @@ import {
 import { StudioEngine } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import type { NodeTransform } from '@/scenes/sceneTypes';
+import type { GraphicItem } from '@/graphics/graphicsTypes';
 import { useShell } from './ShellContext';
 
 interface EditorBridgeValue {
@@ -22,6 +23,10 @@ interface EditorBridgeValue {
   applyNodeTransforms: (nodes: NodeTransform[]) => { restored: number; missing: number };
   captureThumbnail: (width?: number) => string;
   getActiveCameraId: () => string;
+  playGraphic: (item: GraphicItem) => void;
+  stopGraphic: (id: string) => void;
+  updateGraphic: (item: GraphicItem) => void;
+  clearGraphics: () => void;
   sceneNodes: SceneNodeInfo[];
 }
 
@@ -134,6 +139,11 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
 
   const getActiveCameraId = useCallback(() => engineRef.current?.getActiveCameraId() ?? 'cam1', []);
 
+  const playGraphic = useCallback((item: GraphicItem) => { engineRef.current?.playGraphic(item); }, []);
+  const stopGraphic = useCallback((id: string) => { engineRef.current?.stopGraphic(id); }, []);
+  const updateGraphic = useCallback((item: GraphicItem) => { engineRef.current?.updateGraphic(item); }, []);
+  const clearGraphics = useCallback(() => { engineRef.current?.clearGraphics(); }, []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -146,6 +156,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         applyNodeTransforms,
         captureThumbnail,
         getActiveCameraId,
+        playGraphic,
+        stopGraphic,
+        updateGraphic,
+        clearGraphics,
         sceneNodes,
       }}
     >
