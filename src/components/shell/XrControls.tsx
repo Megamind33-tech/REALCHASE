@@ -3,10 +3,12 @@ import { Headset, Smartphone } from 'lucide-react';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { useShell } from '@/context/ShellContext';
 
-// Real WebXR entry points. Buttons are capability-gated: each is enabled only
-// when navigator.xr reports the session mode is actually supported on this
-// device/browser (and a secure context). Otherwise it is disabled with an
-// honest reason — never a fake "Enter AR" that does nothing.
+// Headset/device WebXR PREVIEW entry points (view the virtual set in a VR
+// headset or an AR-capable device). This is NOT broadcast AR — it does not
+// composite AR graphics into the on-air program. Broadcast AR (camera-tracked
+// AR objects in the program output, Zero Density-style) is a separate, planned
+// feature. Buttons are capability-gated: enabled only when navigator.xr reports
+// the session mode is actually supported (secure context + real device).
 export function XrControls() {
   const { getXRSupport, enterXR, exitXR } = useEditorBridge();
   const { state, dispatch } = useShell();
@@ -32,7 +34,7 @@ export function XrControls() {
 
   const leave = async () => { await exitXR(); setInXR(false); };
 
-  const unsupportedTitle = 'Requires a WebXR device over HTTPS (headset for VR, AR-capable device for AR).';
+  const unsupportedTitle = 'Requires a WebXR device over HTTPS (headset for VR, AR-capable device for AR). This is a headset/device preview, not broadcast AR.';
 
   if (inXR) {
     return (
@@ -47,10 +49,11 @@ export function XrControls() {
 
   return (
     <div style={{ display: 'flex', gap: 2 }} data-testid="xr-controls">
+      <span style={{ fontSize: 8, color: 'var(--text-muted)', alignSelf: 'center', marginRight: 2 }} title="Headset/device preview — not broadcast AR">XR&nbsp;Preview</span>
       <button
         onClick={() => void go('immersive-vr')}
         disabled={!support.vr}
-        title={support.vr ? 'Enter immersive VR' : `VR unavailable. ${unsupportedTitle}`}
+        title={support.vr ? 'Preview the set in a VR headset' : `VR unavailable. ${unsupportedTitle}`}
         data-testid="enter-vr"
         style={{
           display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, height: 22, padding: '0 8px', borderRadius: 3,

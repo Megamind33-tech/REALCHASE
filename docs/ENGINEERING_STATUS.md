@@ -1,6 +1,34 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
-## WebXR (AR + VR) Pass (2026-06-14)
+## Audio Mixer Pass (2026-06-14)
+
+- **Real broadcast audio mixer** (`src/audio/audioMixer.ts`, Web Audio API).
+  Each live source's audio runs through its own `GainNode` into a master bus
+  (`MediaStreamAudioDestinationNode`). **Fader / mute / solo / master genuinely
+  change what is recorded and streamed** — the master bus replaces the raw
+  Program audio in both the MediaRecorder and WHIP output paths.
+- Wired in `SourcesContext` (graph synced to live sources); exposed via
+  `useSources` (`audioParams`, `setChannelParams`, `masterGain`, `setMasterGain`,
+  `getChannelLevel`, `getMasterLevel`).
+- `Audio` module is now a real mixer: vertical channel strips with post-fader
+  RMS meters, mute/solo, and a master strip. Levels are measured, never faked.
+- Still future: EQ/compression, audio-only monitoring bus, per-bus routing.
+
+## Broadcast AR vs. headset XR — correction (2026-06-14)
+
+- The WebXR feature below is a **headset/device preview** of the virtual set
+  (immersive-vr / immersive-ar sessions). It is **relabelled "XR Preview"** to
+  avoid confusion. It is **NOT broadcast AR**.
+- **Broadcast AR (Zero Density / Reality-Engine style)** — AR graphics/objects
+  anchored in the camera-tracked studio world space and composited into the
+  *on-air program output* over the live camera — is a **distinct feature that is
+  not yet built**. Foundations already present: FreeD camera tracking, the live
+  3D set, and program-output compositing. Planned approach: an "AR layer" of
+  scene objects/graphics that are world-locked to the tracked camera and toggled
+  on-air into the Program composite (no headset required). Tracked in
+  NEXT_WORK_QUEUE as the next major feature.
+
+## WebXR (headset preview) Pass (2026-06-14)
 
 - Added **real immersive VR and AR** via Babylon's built-in WebXR
   (`WebXRDefaultExperience`). Engine: `getXRSupport()`, `enterXR(mode)`,
@@ -19,7 +47,7 @@ Addressed real gaps flagged in review (no more "coming soon" dead-ends):
 - **Rotate assets:** confirmed working — numeric rotation (Inspector Vec3Row) and the rotate gizmo (transform-mode toolbar) both drive the selected object.
 - **Every module now has a real workspace** (was 6 placeholder screens): Cameras (selection + FreeD tracking), Lighting (key/ambient/accent + presets), Audio (live meters), Outputs (composite preview + destinations), Overlays (graphics stack toggles), Scripts (timeline rundown), Settings (real preferences). All compose existing real state — no mock controls.
 - **Graphics fonts:** font-family selector added to lower third / ticker / logo bug; applies live to on-air graphics.
-- **Still genuinely missing / scoped next:** asset material *textures*, audio mixer faders, scripting API. (AR/WebXR now added — see WebXR pass above.) Tracked honestly in NEXT_WORK_QUEUE.
+- **Still genuinely missing / scoped next:** **broadcast AR** (Zero Density-style camera-tracked AR in the program output — the real ask; headset WebXR is only a preview), asset material *textures*, audio EQ/compression. (Audio mixer now done; headset XR preview added.) Tracked in NEXT_WORK_QUEUE.
 
 ## Milestone 8 Update — Fork Wiring Audit (2026-06-14)
 
@@ -94,7 +122,7 @@ display-only area pending Milestone 5.
 | **scenes** | WORKING | 85% | M3 — save/load/recapture/rename/delete named scenes with live thumbnails |
 | **graphics** | WORKING | 85% | M4 — lower third, ticker, logo bug; real overlay, play/stop/live-update |
 | **outputs** | WORKING | 70% | Real composite output preview + recording/air status + destinations list (full workspace) |
-| **audio** | WORKING | 55% | Real per-source live level meters (full workspace); mixer/faders still future |
+| **audio** | WORKING | 70% | Real Web Audio mixer: per-source fader/mute/solo + master feed the recorded/streamed bus; post-fader meters |
 | **assets** | PARTIAL | 40% | Real GLB/glTF import + inspector in the Builder's AssetPanel; no standalone module workspace |
 | **overlays** | WORKING | 70% | Real broadcast-graphics stack with per-overlay on-air toggles + layer order |
 | **lighting** | WORKING | 75% | Real key/ambient/accent lighting workspace + presets |

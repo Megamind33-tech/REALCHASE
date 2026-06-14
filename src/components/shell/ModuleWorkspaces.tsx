@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Camera, Crosshair, Volume2, Radio, SquareStack, Settings as SettingsIcon, ScrollText, Square, Sun } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
@@ -7,7 +7,6 @@ import { useTimeline } from '@/context/TimelineContext';
 import { useLighting } from '@/context/LightingContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { Slider, Toggle } from '@/components/ui/Controls';
-import { AudioMeter } from '@/components/audio/AudioMeter';
 import { CompositeOutputPreview } from '@/components/output/CompositeOutputPreview';
 import { CAMERA_SHOTS } from '@/data/mock/studioData';
 import { LIGHTING_PRESETS, type LightChannel, type LightingSettings } from '@/engine/lighting';
@@ -142,23 +141,101 @@ export function LightingWorkspace() {
 }
 
 /* ---------------- Audio ---------------- */
+function gainToDb(g: number): string {
+  if (g <= 0.001) return '-∞';
+  const db = 20 * Math.log10(g);
+  return `${db >= 0 ? '+' : ''}${db.toFixed(1)}`;
+}
+
+/** A single mixer channel strip with a real post-fader meter. */
+function ChannelStrip({ id, name }: { id: string; name: string }) {
+  const { audioParams, setChannelParams, getChannelLevel } = useSources();
+  const p = audioParams(id);
+  const fillRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const pct = Math.min(100, getChannelLevel(id) * 180);
+      if (fillRef.current) {
+        fillRef.current.style.height = `${pct}%`;
+        fillRef.current.style.background = pct > 85 ? 'var(--status-error)' : pct > 65 ? 'var(--status-warn)' : 'var(--status-ok)';
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [id, getChannelLevel]);
+
+  return (
+    <div data-testid={`mixer-channel-${id}`} style={{ width: 92, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 10, background: 'var(--bg-panel-raised)', border: '1px solid var(--border-subtle)', borderRadius: 6 }}>
+      <span style={{ fontSize: 10, fontWeight: 600, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</span>
+      <div style={{ display: 'flex', gap: 8, height: 130 }}>
+        <input
+          type="range" min={0} max={1.5} step={0.01} value={p.gain}
+          onChange={(e) => setChannelParams(id, { gain: Number(e.currentTarget.value) })}
+          aria-label={`${name} fader`}
+          style={{ writingMode: 'vertical-lr', direction: 'rtl', width: 24, accentColor: 'var(--accent-blue)' } as React.CSSProperties}
+        />
+        <div style={{ width: 8, height: '100%', background: 'var(--bg-app)', borderRadius: 2, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
+          <div ref={fillRef} style={{ width: '100%', height: '0%', background: 'var(--status-ok)' }} />
+        </div>
+      </div>
+      <span className="mono" style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{gainToDb(p.gain)} dB</span>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <button onClick={() => setChannelParams(id, { muted: !p.muted })} aria-pressed={p.muted} title="Mute"
+          style={{ width: 26, height: 22, fontSize: 9, fontWeight: 700, borderRadius: 3, border: `1px solid ${p.muted ? 'var(--status-rec)' : 'var(--border-subtle)'}`, background: p.muted ? 'rgba(239,68,68,0.2)' : 'transparent', color: p.muted ? 'var(--status-rec)' : 'var(--text-secondary)' }}>M</button>
+        <button onClick={() => setChannelParams(id, { solo: !p.solo })} aria-pressed={p.solo} title="Solo"
+          style={{ width: 26, height: 22, fontSize: 9, fontWeight: 700, borderRadius: 3, border: `1px solid ${p.solo ? 'var(--status-warn)' : 'var(--border-subtle)'}`, background: p.solo ? 'rgba(234,179,8,0.2)' : 'transparent', color: p.solo ? 'var(--status-warn)' : 'var(--text-secondary)' }}>S</button>
+      </div>
+    </div>
+  );
+}
+
 export function AudioWorkspace() {
-  const { sources } = useSources();
+  const { sources, masterGain, setMasterGain, getMasterLevel } = useSources();
   const liveAudio = sources.filter((s) => s.status === 'live' && s.stream && s.stream.getAudioTracks().length > 0);
+  const masterFill = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const pct = Math.min(100, getMasterLevel() * 180);
+      if (masterFill.current) {
+        masterFill.current.style.height = `${pct}%`;
+        masterFill.current.style.background = pct > 85 ? 'var(--status-error)' : pct > 65 ? 'var(--status-warn)' : 'var(--status-ok)';
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [getMasterLevel]);
+
   return (
     <div data-testid="audio-surface" style={surface}>
       <div style={wrap}>
-        <Title icon={Volume2} title="Audio" subtitle="Live per-source audio levels, measured from each source's real audio track." />
+        <Title icon={Volume2} title="Audio Mixer" subtitle="Real per-source faders, mute and solo. The master bus is what gets recorded and streamed." />
         <div style={card}>
           {liveAudio.length === 0 ? (
             <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-              No source with a live audio track. Add a webcam or media source with audio in the <strong>Switcher</strong>; real levels appear here — never faked.
+              No source with a live audio track. Add a webcam or media source with audio in the <strong>Switcher</strong>; channel strips appear here and feed the master mix — never faked.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {liveAudio.map((s) => <AudioMeter key={s.id} stream={s.stream as MediaStream} label={s.name} />)}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'stretch', flexWrap: 'wrap' }}>
+              {liveAudio.map((s) => <ChannelStrip key={s.id} id={s.id} name={s.name} />)}
+              {/* Master strip */}
+              <div style={{ width: 100, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 10, background: 'var(--accent-blue-dim)', border: '1px solid var(--accent-blue)', borderRadius: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent-blue)' }}>MASTER</span>
+                <div style={{ display: 'flex', gap: 8, height: 130 }}>
+                  <input type="range" min={0} max={1.5} step={0.01} value={masterGain} onChange={(e) => setMasterGain(Number(e.currentTarget.value))} aria-label="Master fader"
+                    style={{ writingMode: 'vertical-lr', direction: 'rtl', width: 24, accentColor: 'var(--accent-blue)' } as React.CSSProperties} />
+                  <div style={{ width: 8, height: '100%', background: 'var(--bg-app)', borderRadius: 2, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
+                    <div ref={masterFill} style={{ width: '100%', height: '0%', background: 'var(--status-ok)' }} />
+                  </div>
+                </div>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--text-secondary)' }}>{gainToDb(masterGain)} dB</span>
+              </div>
             </div>
           )}
+          <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 10 }}>Faders, mute and solo apply to the real Web Audio mix bus that is recorded and published — meters are post-fader RMS.</p>
         </div>
       </div>
     </div>

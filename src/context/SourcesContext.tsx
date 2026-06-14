@@ -28,6 +28,7 @@ import {
 } from '@/sources/sourceTypes';
 import { acquireImageFile, acquireVideoFile, type AcquiredSourceMedia } from '@/sources/mediaSources';
 import { getRecordingCapabilities, type RecordingCapability, type RecordingFormat } from '@/output/recording';
+import { AudioMixer, type ChannelParams } from '@/audio/audioMixer';
 
 interface SourcesState {
   sources: Source[];
@@ -112,6 +113,14 @@ interface SourcesValue {
   updateDestinationLeg: (id: string, kind: LegKind, patch: Partial<OutputLeg>) => void;
   armedTargetCount: number;
   liveWebsite: { whepUrl: string; hlsUrl: string } | null;
+  // Real audio mixer: per-source fader/mute/solo + master, mixed into the
+  // program audio that is recorded and streamed.
+  audioParams: (id: string) => ChannelParams;
+  setChannelParams: (id: string, patch: Partial<ChannelParams>) => void;
+  masterGain: number;
+  setMasterGain: (gain: number) => void;
+  getChannelLevel: (id: string) => number;
+  getMasterLevel: () => number;
 }
 
 function fmtTime(ms: number): string {
@@ -177,6 +186,36 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
 
   const programSource = state.sources.find((s) => s.id === state.programId) ?? null;
   const previewSource = state.sources.find((s) => s.id === state.previewId) ?? null;
+
+  // --- Real audio mixer: route every live source's audio through per-channel
+  // GainNodes into a master bus whose stream feeds recording/streaming. ---
+  const mixerRef = useRef<AudioMixer | null>(null);
+  if (!mixerRef.current) mixerRef.current = new AudioMixer();
+  const [masterGain, setMasterGainState] = useState(1);
+  // Bump to force re-render of mixer UI when channel params change.
+  const [, setMixTick] = useState(0);
+
+  // Keep the mixer graph in sync with the current live sources.
+  useEffect(() => {
+    mixerRef.current?.sync(state.sources.map((s) => ({ id: s.id, stream: s.stream })));
+  }, [state.sources]);
+
+  useEffect(() => () => { mixerRef.current?.dispose(); mixerRef.current = null; }, []);
+
+  const audioParams = useCallback((id: string) => mixerRef.current?.getParams(id) ?? { gain: 1, muted: false, solo: false }, []);
+  const setChannelParams = useCallback((id: string, patch: Partial<ChannelParams>) => {
+    mixerRef.current?.setParams(id, patch);
+    setMixTick((n) => n + 1);
+  }, []);
+  const setMasterGain = useCallback((gain: number) => {
+    mixerRef.current?.setMaster(gain);
+    setMasterGainState(gain);
+  }, []);
+  const getChannelLevel = useCallback((id: string) => mixerRef.current?.level(id) ?? 0, []);
+  const getMasterLevel = useCallback(() => mixerRef.current?.masterLevel() ?? 0, []);
+
+  // The mixed master audio tracks (empty until the graph has live audio).
+  const mixedAudioTracks = useCallback(() => mixerRef.current?.getMixedAudioTracks() ?? [], []);
 
   // Drive the Babylon Program output: whenever the Program source (or its
   // stream, or the engine instance) changes, push the live stream into the
@@ -385,7 +424,11 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     // video track if the canvas isn't capturable.
     const canvasStream = captureOutputStream(30);
     const videoTracks = canvasStream?.getVideoTracks().length ? canvasStream.getVideoTracks() : program.stream.getVideoTracks();
-    const mixed = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
+    // Prefer the mixer's master bus (fader/mute/solo applied) for audio; fall
+    // back to the raw Program audio if the mixer graph isn't active.
+    const mixerAudio = mixedAudioTracks();
+    const audioTracks = mixerAudio.length ? mixerAudio : program.stream.getAudioTracks();
+    const mixed = new MediaStream([...videoTracks, ...audioTracks]);
     let rec: MediaRecorder;
     try {
       rec = new MediaRecorder(mixed, { mimeType: capability.mimeType });
@@ -496,7 +539,10 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     // Program video track, plus the Program audio.
     const canvasStream = captureOutputStream(30);
     const videoTracks = canvasStream?.getVideoTracks().length ? canvasStream.getVideoTracks() : program.stream.getVideoTracks();
-    const out = new MediaStream([...videoTracks, ...program.stream.getAudioTracks()]);
+    // Prefer the mixer's master bus (fader/mute/solo applied) for audio.
+    const mixerAudio = mixedAudioTracks();
+    const audioTracks = mixerAudio.length ? mixerAudio : program.stream.getAudioTracks();
+    const out = new MediaStream([...videoTracks, ...audioTracks]);
 
     // Arm the relay fan-out BEFORE publishing so MediaMTX's runOnReady fires the
     // moment the WHIP stream is ready. Website/WHEP playback works regardless; a
@@ -583,6 +629,12 @@ export function SourcesProvider({ children }: { children: ReactNode }) {
     updateDestinationLeg,
     armedTargetCount,
     liveWebsite,
+    audioParams,
+    setChannelParams,
+    masterGain,
+    setMasterGain,
+    getChannelLevel,
+    getMasterLevel,
   };
 
   return <SourcesContext.Provider value={value}>{children}</SourcesContext.Provider>;

@@ -10,7 +10,9 @@
 - **M8 (this pass):** Verified all 11 forks against real code — 2 ACTIVE (npm Babylon + editor-tools), 2 EXTERNAL (MediaMTX + gstreamer via relay/ffmpeg), 7 REFERENCE-ONLY. No GPL code linked. `@babylonjs/materials` retained deliberately for editor-tools `.babylon` pack loading (documented, not pruned). See `FORKS_AUDIT.md` → "Milestone 8 — Fork Wiring Verification" and enriched `FORKS_MANIFEST.json` (`wiringStatus`/`verifiedUsage`).
 - **Verification (this pass):** `tsc -b` clean; anti-demo smoke passes.
 - **Known blocker:** Production `vite build` exceeded 304.5s without output on the OneDrive workstation (builds ~2.5–3 min in CI/Linux). Do not report the production bundle as passing on that workstation until resolved.
-- **Next milestones:** M9 (performance & stress testing), M10 (final polish & delivery). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
+- **Post-milestone hardening (done since M8):** revived all 6 placeholder module screens into real workspaces; asset/group delete (button + Delete key); graphic font selection; headset WebXR *preview* (relabelled — not broadcast AR); **real Web Audio mixer** (per-source fader/mute/solo + master into the recorded/streamed bus).
+- **NEXT MAJOR FEATURE — Broadcast AR (Zero Density-style):** AR graphics/objects world-locked to the FreeD-tracked camera, composited into the on-air program output (no headset). Foundations exist (camera tracking, 3D set, program compositing). This is the real "AR" the product needs; the headset WebXR is only a set preview.
+- **Then:** M9 (performance & stress testing), M10 (final polish). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  
 **Approach:** Milestone-based; each completes a distinct value delivery
