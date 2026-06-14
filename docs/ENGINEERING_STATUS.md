@@ -1,5 +1,17 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
+## WebXR (AR + VR) Pass (2026-06-14)
+
+- Added **real immersive VR and AR** via Babylon's built-in WebXR
+  (`WebXRDefaultExperience`). Engine: `getXRSupport()`, `enterXR(mode)`,
+  `exitXR()`, `isInXR()`; exposed through `EditorBridge`.
+- UI: `XrControls` in the Builder viewport toolbar — **capability-gated** VR/AR
+  buttons. Each is enabled only when `navigator.xr.isSessionSupported(...)`
+  returns true on the device (and a secure context); otherwise it is disabled
+  with an honest reason. No fake "Enter AR".
+- Lives in the Builder viewport because the immersive session needs the live
+  Babylon canvas. Errors surface via the engine `error` event → toast.
+
 ## Editing Completeness Pass — Revive Dead Screens (2026-06-14)
 
 Addressed real gaps flagged in review (no more "coming soon" dead-ends):
@@ -7,7 +19,7 @@ Addressed real gaps flagged in review (no more "coming soon" dead-ends):
 - **Rotate assets:** confirmed working — numeric rotation (Inspector Vec3Row) and the rotate gizmo (transform-mode toolbar) both drive the selected object.
 - **Every module now has a real workspace** (was 6 placeholder screens): Cameras (selection + FreeD tracking), Lighting (key/ambient/accent + presets), Audio (live meters), Outputs (composite preview + destinations), Overlays (graphics stack toggles), Scripts (timeline rundown), Settings (real preferences). All compose existing real state — no mock controls.
 - **Graphics fonts:** font-family selector added to lower third / ticker / logo bug; applies live to on-air graphics.
-- **Still genuinely missing / scoped next:** AR/WebXR entry point, asset material *textures*, audio mixer faders, scripting API. Tracked honestly in NEXT_WORK_QUEUE.
+- **Still genuinely missing / scoped next:** asset material *textures*, audio mixer faders, scripting API. (AR/WebXR now added — see WebXR pass above.) Tracked honestly in NEXT_WORK_QUEUE.
 
 ## Milestone 8 Update — Fork Wiring Audit (2026-06-14)
 

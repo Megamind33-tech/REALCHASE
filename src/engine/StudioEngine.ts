@@ -46,10 +46,13 @@ import {
   AssetImportError, type ImportedAsset, type AssetGroup, type SerializedAsset,
   type SerializedGroup, type SceneSnapshot, type AssetTransform, type ExternalResolver,
 } from '@/integrations/render-engine/types';
+import { WebXRDefaultExperience } from '@babylonjs/core/XR/webXRDefaultExperience';
 import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
 import { DEFAULT_LIGHTING, hexToRgb, rgbToHex, type LightingSettings } from './lighting';
+
+export type XRMode = 'immersive-vr' | 'immersive-ar';
 
 export type StudioEngineListener = (event: StudioEngineEvent) => void;
 
@@ -184,6 +187,8 @@ export class StudioEngine {
   private scene: Scene | null = null;
   private gizmoManager: GizmoManager | null = null;
   private graphics: BroadcastGraphics | null = null;
+  private xr: WebXRDefaultExperience | null = null;
+  private xrMode: XRMode | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private listeners = new Set<StudioEngineListener>();
   private refs: DeskSceneRefs | null = null;
@@ -1471,6 +1476,51 @@ export class StudioEngine {
   isGraphicOn(id: string): boolean { return this.graphics?.isOn(id) ?? false; }
   clearGraphics() { this.graphics?.clear(); }
 
+  // ---- WebXR (real immersive VR / AR via the browser's WebXR device API) ----
+  /** What the current device/browser actually supports. Honest false when the
+   *  WebXR API is absent (e.g. non-secure context or no headset/AR device). */
+  async getXRSupport(): Promise<{ vr: boolean; ar: boolean }> {
+    const xr = (typeof navigator !== 'undefined' ? (navigator as Navigator & { xr?: { isSessionSupported?: (m: string) => Promise<boolean> } }).xr : undefined);
+    if (!xr?.isSessionSupported) return { vr: false, ar: false };
+    const safe = async (m: string) => { try { return await xr.isSessionSupported!(m); } catch { return false; } };
+    const [vr, ar] = await Promise.all([safe('immersive-vr'), safe('immersive-ar')]);
+    return { vr, ar };
+  }
+
+  isInXR(): boolean { return this.xrMode !== null; }
+  getXRMode(): XRMode | null { return this.xrMode; }
+
+  /** Enter an immersive session. Returns false (no throw) if unsupported so the
+   *  UI can show an honest message instead of crashing. */
+  async enterXR(mode: XRMode): Promise<boolean> {
+    if (!this.scene) return false;
+    try {
+      if (!this.xr) {
+        this.xr = await WebXRDefaultExperience.CreateAsync(this.scene, {
+          disableDefaultUI: true,
+          disableTeleportation: true,
+        });
+      }
+      if (!this.xr.baseExperience) return false;
+      const refSpace: XRReferenceSpaceType = mode === 'immersive-ar' ? 'local' : 'local-floor';
+      await this.xr.baseExperience.enterXRAsync(mode, refSpace);
+      this.xrMode = mode;
+      this.xr.baseExperience.onStateChangedObservable.add((s) => {
+        // WebXRState.NOT_IN_XR === 0
+        if (s === 0) this.xrMode = null;
+      });
+      return true;
+    } catch (err) {
+      this.emit({ type: 'error', message: err instanceof Error ? err.message : 'Could not start the XR session.' });
+      return false;
+    }
+  }
+
+  async exitXR(): Promise<void> {
+    try { await this.xr?.baseExperience?.exitXRAsync(); } catch { /* already out */ }
+    this.xrMode = null;
+  }
+
   // ---- Studio lighting (real Babylon lights) ----
   private lighting: LightingSettings = DEFAULT_LIGHTING;
 
@@ -1716,6 +1766,9 @@ export class StudioEngine {
     }
     this.trackingActive = false;
     this.resizeObserver?.disconnect();
+    this.xr?.dispose();
+    this.xr = null;
+    this.xrMode = null;
     this.graphics?.dispose();
     this.graphics = null;
     this.gizmoManager?.dispose();

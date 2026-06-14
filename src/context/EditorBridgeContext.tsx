@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { StudioEngine, type TrackingStatus } from '@/engine/StudioEngine';
+import { StudioEngine, type TrackingStatus, type XRMode } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
 import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
@@ -62,6 +62,9 @@ interface EditorBridgeValue {
   getLighting: () => LightingSettings | null;
   getSelectedMaterial: () => MaterialInfo;
   setSelectedMaterial: (patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }) => boolean;
+  getXRSupport: () => Promise<{ vr: boolean; ar: boolean }>;
+  enterXR: (mode: XRMode) => Promise<boolean>;
+  exitXR: () => Promise<void>;
   assets: ImportedAsset[];
   groups: AssetGroup[];
   sceneNodes: SceneNodeInfo[];
@@ -299,6 +302,10 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
   const getSelectedMaterial = useCallback((): MaterialInfo => engineRef.current?.getSelectedMaterial() ?? { hasMaterial: false, kind: 'none', color: '#808080', emissive: '#000000', metallic: null, roughness: null }, []);
   const setSelectedMaterial = useCallback((patch: { color?: string; emissive?: string; metallic?: number; roughness?: number }) => engineRef.current?.setSelectedMaterial(patch) ?? false, []);
 
+  const getXRSupport = useCallback(() => engineRef.current?.getXRSupport() ?? Promise.resolve({ vr: false, ar: false }), []);
+  const enterXR = useCallback((mode: XRMode) => engineRef.current?.enterXR(mode) ?? Promise.resolve(false), []);
+  const exitXR = useCallback(() => engineRef.current?.exitXR() ?? Promise.resolve(), []);
+
   return (
     <EditorBridgeContext.Provider
       value={{
@@ -343,6 +350,9 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         getLighting,
         getSelectedMaterial,
         setSelectedMaterial,
+        getXRSupport,
+        enterXR,
+        exitXR,
         assets,
         groups,
         sceneNodes,

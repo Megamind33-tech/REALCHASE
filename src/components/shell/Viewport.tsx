@@ -14,6 +14,7 @@ import {
   CamerasWorkspace, LightingWorkspace, AudioWorkspace, OutputsWorkspace,
   OverlaysWorkspace, ScriptsWorkspace, SettingsWorkspace,
 } from '@/components/shell/ModuleWorkspaces';
+import { XrControls } from '@/components/shell/XrControls';
 import type { QualityMode, TransformMode } from '@/context/shellTypes';
 
 const QUALITY_MODES: QualityMode[] = ['low', 'balanced', 'high'];
@@ -185,6 +186,8 @@ export function Viewport() {
         </div>
 
         <div style={{ flex: 1 }} />
+
+        <XrControls />
 
         <div style={{ display: 'flex', border: '1px solid var(--border-subtle)', borderRadius: 3, overflow: 'hidden' }}>
           {QUALITY_MODES.map((mode) => (
