@@ -69,3 +69,46 @@ This document lists all audited open-source forks and sources collected for the 
   is retained only as a *look/PBR reference* — no Filament code is compiled or linked;
   CHASE renders through Babylon. Lighting presets follow conventional broadcast looks
   (original values). No GPL dependency is involved.
+
+---
+
+## Milestone 8 — Fork Wiring Verification (2026-06-14)
+
+Every manifest entry was re-checked against the **actual code** on `chase/fork-audit`.
+The `forks/` clones are git-ignored local references (see `.gitignore: /forks/`); only
+npm packages are shipped. Integration status is grounded in real `import`s / external
+calls, not intent.
+
+| Fork / Source | License | Ships as | Status | Verified code touchpoint |
+|:---|:---|:---|:---|:---|
+| **BabylonJS/Babylon.js** | Apache-2.0 | npm `@babylonjs/core`, `@babylonjs/gui`, `@babylonjs/loaders` | **ACTIVE** | `@babylonjs/core` in 4 files (engine, scene, graphics), `@babylonjs/gui` in `BroadcastGraphics.ts`, `@babylonjs/loaders` in `StudioEngine.ts` |
+| **BabylonJS/Editor** | Apache-2.0 | npm `babylonjs-editor-tools` | **ACTIVE** | `StudioEngine.ts:27` imports `loadScene` from `babylonjs-editor-tools/loading/loader`; used in `loadPack()` and thumbnail capture |
+| **bluenviron/mediamtx** | MIT | external process/service | **EXTERNAL (wired)** | `src/output/relay.ts` derives WHIP/WHEP/HLS relay URLs + `runOnReady` fan-out; `destinations.ts`, `SourcesContext.tsx` arm it |
+| **google/filament** | Apache-2.0 | — | **REFERENCE-ONLY** | No import; PBR/look reference for M6 lighting/materials. Not compiled or linked |
+| **playcanvas/engine** | MIT | — | **REFERENCE-ONLY** | No import; low-spec runtime comparison only |
+| **gstreamer/gstreamer** | LGPL-2.1 | external (via MediaMTX/ffmpeg) | **EXTERNAL (indirect)** | Not linked; reached only through the MediaMTX relay / system ffmpeg path |
+| **datarhei/restreamer** | Apache-2.0 | — | **REFERENCE-ONLY** | No import; stream-target UX reference |
+| **CasparCG/server** | GPL-3.0 | external-process-only | **REFERENCE-ONLY (GPL boundary)** | No code copied; only the CG play/stop/update paradigm informs `src/graphics/*` (original code) |
+| **Sofie-Automation/Sofie-TV-automation** | MIT | — | **REFERENCE-ONLY** | No import; rundown/timeline paradigm informs `src/timeline/*` (original code) |
+| **Sofie-Automation/sofie-core** | MIT | — | **REFERENCE-ONLY** | No import; timeline-state model reference |
+| **obsproject/obs-studio** | GPL-2.0 | external-process-only | **REFERENCE-ONLY (GPL boundary)** | No code copied; mixer/compositing reference only |
+
+### npm dependency findings
+
+- All runtime deps are imported in `src/` **except `@babylonjs/materials`**, which is
+  referenced only in `vite.config.ts` (manualChunks + optimizeDeps). It is **deliberately
+  retained**: `babylonjs-editor-tools` `loadScene` resolves extended material types from
+  `@babylonjs/materials` when loading `.babylon` studio packs (`/scenes/<id>/scene.babylon`).
+  Removing it would break pack loading once packaged scenes exist, so it stays installed
+  and is documented here rather than pruned. Not an unused-import leak — no `src` file
+  statically imports it today, by design.
+- No GPL/strong-copyleft code is imported or bundled. The only copyleft touchpoints
+  (CasparCG, OBS, gstreamer) remain external-process / reference-only, honouring the
+  license boundaries in the "Key Findings" section above.
+
+### Conclusion
+
+All 11 forks are accounted for: **2 ACTIVE (npm)**, **2 EXTERNAL (MediaMTX + gstreamer via
+relay/ffmpeg)**, **7 REFERENCE-ONLY**. No fork is silently unused or mis-licensed; no GPL
+code is linked. No code changes were required for this milestone — it is a verification
+pass that keeps the manifest honest.

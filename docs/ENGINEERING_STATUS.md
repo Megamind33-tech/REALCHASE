@@ -1,5 +1,13 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
+## Milestone 8 Update — Fork Wiring Audit (2026-06-14)
+
+- **Branch:** `chase/fork-audit`
+- Re-verified all 11 forks against real code: **2 ACTIVE** (npm `@babylonjs/*` + `babylonjs-editor-tools`), **2 EXTERNAL** (MediaMTX relay + gstreamer via ffmpeg), **7 REFERENCE-ONLY** (playcanvas, filament, restreamer, CasparCG, Sofie×2, OBS).
+- **No GPL code linked.** CasparCG (GPL-3.0) and OBS (GPL-2.0) remain reference/external-process only; gstreamer (LGPL) reached only through the relay/ffmpeg boundary.
+- `@babylonjs/materials` has no static `src` import but is **deliberately retained** for `babylonjs-editor-tools` `.babylon` pack loading; documented in `FORKS_AUDIT.md`, not pruned.
+- Deliverables: enriched `FORKS_MANIFEST.json` (`wiringStatus`/`verifiedUsage`) + `FORKS_AUDIT.md` "Milestone 8 — Fork Wiring Verification" table. Verification-only pass; no source changes. `tsc -b` clean, anti-demo smoke passes.
+
 ## Milestone 2 Completion Update (2026-06-14)
 
 - **Branch:** `chase/fork-audit`

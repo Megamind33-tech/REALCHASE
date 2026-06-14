@@ -10,7 +10,9 @@
     "commit": "b1fc3616b27fe1e70e667c1ffedb552890bf1a02",
     "integrationMode": "direct-fork",
     "priority": "highest",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "ACTIVE",
+    "verifiedUsage": "npm babylonjs-editor-tools; loadScene used in StudioEngine.ts loadPack()"
   },
   {
     "name": "BabylonJS/Babylon.js",
@@ -23,7 +25,9 @@
     "commit": "73999058f5defdca261c2f1e010bb15f6b197e68",
     "integrationMode": "dependency",
     "priority": "highest",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "ACTIVE",
+    "verifiedUsage": "npm @babylonjs/core,gui,loaders; imported across engine, graphics, scene"
   },
   {
     "name": "playcanvas/engine",
@@ -36,7 +40,9 @@
     "commit": "0e2e3f3f45f2e8e751a29a387085d68ca67d956c",
     "integrationMode": "dependency",
     "priority": "high",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "no import; low-spec runtime comparison only"
   },
   {
     "name": "google/filament",
@@ -49,7 +55,9 @@
     "commit": "08a47f8d11ae82afb6ffbeb58a07b209700dcbd6",
     "integrationMode": "reference-only",
     "priority": "medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "no import; PBR/look reference for M6 lighting/materials"
   },
   {
     "name": "bluenviron/mediamtx",
@@ -62,7 +70,9 @@
     "commit": "e13e9660d19e6744c92d013d86a1257910f82a6d",
     "integrationMode": "external-process-or-service",
     "priority": "high",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "EXTERNAL",
+    "verifiedUsage": "src/output/relay.ts derives WHIP/WHEP/HLS + runOnReady fan-out"
   },
   {
     "name": "gstreamer/gstreamer",
@@ -75,7 +85,9 @@
     "commit": "457b297cf0405851736cf78bdb4cb07b46123b57",
     "integrationMode": "dependency-packages",
     "priority": "high",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "EXTERNAL-INDIRECT",
+    "verifiedUsage": "not linked; reached via MediaMTX relay / system ffmpeg (LGPL boundary)"
   },
   {
     "name": "datarhei/restreamer",
@@ -88,7 +100,9 @@
     "commit": "fd12aee2a289e9be4fbf45fc1dfa50838cfb149f",
     "integrationMode": "reference-only",
     "priority": "low-medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "no import; stream-target UX reference"
   },
   {
     "name": "CasparCG/server",
@@ -101,7 +115,9 @@
     "commit": "d603ee91fa568ca38199048d38005b886eba75ba",
     "integrationMode": "external-process-only",
     "priority": "medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "GPL: no code copied; CG paradigm informs src/graphics (original code)"
   },
   {
     "name": "Sofie-Automation/Sofie-TV-automation",
@@ -114,7 +130,9 @@
     "commit": "aad82863d37da6fc9b9a4ab3b94df27001be0990",
     "integrationMode": "reference-only",
     "priority": "medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "no import; rundown/timeline paradigm informs src/timeline (original code)"
   },
   {
     "name": "Sofie-Automation/sofie-core",
@@ -127,7 +145,9 @@
     "commit": "0d939461387606e6e58a5ba6845e81dcbf2b746f",
     "integrationMode": "reference-only",
     "priority": "medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "no import; timeline-state model reference"
   },
   {
     "name": "obsproject/obs-studio",
@@ -140,6 +160,8 @@
     "commit": "fe522d431e3f778808345776d46c1b3978db0399",
     "integrationMode": "reference-only",
     "priority": "medium",
-    "lastChecked": "2026-06-12"
+    "lastChecked": "2026-06-14",
+    "wiringStatus": "REFERENCE-ONLY",
+    "verifiedUsage": "GPL: no code copied; mixer/compositing reference only"
   }
 ]

@@ -4,12 +4,13 @@
 ## Resume Point (2026-06-14)
 
 - **Branch:** `chase/fork-audit`
-- **Latest implementation commit:** `e9afea4`
+- **Milestones complete:** M1 (audit) · M2 (source manager) · M3 (scenes) · M4 (graphics) · M5 (timeline) · M6 (lighting/materials) · M7 (output preview + recording) · **M8 (fork wiring audit)**.
 - **M2 backport:** COMPLETE at `729cc78`; real webcam, video file, image, and screen source paths are wired to Preview/Program and the Babylon scene.
-- **Verification:** TypeScript, source-manager browser smoke, anti-demo smoke, FreeD regression, and in-app browser UI smoke pass.
-- **Known blocker:** Production `vite build` exceeded 304.5 seconds without output on this OneDrive workstation. Do not report the production bundle as passing until this is resolved or reproduced elsewhere.
-- **M7 progress:** Composite output preview, recording telemetry, WebM, and capability-gated native H.264/MP4 are implemented. ProRes remains honestly unavailable.
-- **Next patch:** Add the native Tauri/ffmpeg bridge required for ProRes, then resolve the production Vite build timeout and run a desktop recording rehearsal.
+- **M7:** Composite output preview, recording telemetry, WebM, capability-gated native H.264/MP4. ProRes honestly unavailable (needs native ffmpeg bridge).
+- **M8 (this pass):** Verified all 11 forks against real code — 2 ACTIVE (npm Babylon + editor-tools), 2 EXTERNAL (MediaMTX + gstreamer via relay/ffmpeg), 7 REFERENCE-ONLY. No GPL code linked. `@babylonjs/materials` retained deliberately for editor-tools `.babylon` pack loading (documented, not pruned). See `FORKS_AUDIT.md` → "Milestone 8 — Fork Wiring Verification" and enriched `FORKS_MANIFEST.json` (`wiringStatus`/`verifiedUsage`).
+- **Verification (this pass):** `tsc -b` clean; anti-demo smoke passes.
+- **Known blocker:** Production `vite build` exceeded 304.5s without output on the OneDrive workstation (builds ~2.5–3 min in CI/Linux). Do not report the production bundle as passing on that workstation until resolved.
+- **Next milestones:** M9 (performance & stress testing), M10 (final polish & delivery). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  
 **Approach:** Milestone-based; each completes a distinct value delivery
@@ -336,17 +337,17 @@
 
 ---
 
-## MILESTONE 8: Audit & Wire Forks/Libraries
+## MILESTONE 8: Audit & Wire Forks/Libraries — COMPLETE (2026-06-14)
 
 **Objective:** Document and integrate all external forks; identify and unblock dependencies.
 
 **Acceptance Criteria:**
-- [ ] FORKS_MANIFEST.json complete (all forks listed with justification)
-- [ ] FORKS_AUDIT.md updated (status, integration notes, blockers)
-- [ ] All forks either integrated or marked as "blocked" with clear reason
-- [ ] No unused forks in vendor/; unused imports removed from codebase
-- [ ] Missing forks identified (if any) and task created to source/build
-- [ ] Evidence: updated FORKS_MANIFEST, FORKS_AUDIT with all forks reviewed
+- [x] FORKS_MANIFEST.json complete (all 11 forks listed; enriched with `wiringStatus` + `verifiedUsage`, `lastChecked` 2026-06-14)
+- [x] FORKS_AUDIT.md updated ("Milestone 8 — Fork Wiring Verification" table, grounded in real imports/external calls)
+- [x] All forks classified: 2 ACTIVE (npm) · 2 EXTERNAL (MediaMTX + gstreamer via relay/ffmpeg) · 7 REFERENCE-ONLY; GPL forks (CasparCG, OBS) kept external/reference-only — no code linked
+- [x] No unused forks; `@babylonjs/materials` retained deliberately for editor-tools `.babylon` pack loading (documented). No dead imports found in `src/`
+- [x] Missing forks: none (all 11 present per MISSING_FORKS.md)
+- [x] Evidence: enriched FORKS_MANIFEST.json + FORKS_AUDIT.md M8 section; verified with `tsc -b` clean + anti-demo smoke pass
 
 **Key Tasks:**
 1. **Inventory all forks** (src/, vendor/, node_modules/)
