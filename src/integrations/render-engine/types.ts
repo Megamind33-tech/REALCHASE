@@ -4,6 +4,11 @@
 
 export type AssetFormat = 'glb' | 'gltf';
 
+/** Built-in parametric primitives the operator can drop into the stage. */
+export type PrimitiveKind = 'box' | 'sphere' | 'cylinder' | 'plane' | 'cone' | 'torus';
+
+export const PRIMITIVE_KINDS: PrimitiveKind[] = ['box', 'sphere', 'cylinder', 'plane', 'cone', 'torus'];
+
 /** Position, Euler rotation (radians) and scaling — engine-neutral. */
 export interface AssetTransform {
   position: [number, number, number];
@@ -33,6 +38,8 @@ export interface ImportedAsset {
   missing: boolean;
   /** Group this asset belongs to, or null when ungrouped. */
   groupId: string | null;
+  /** Set when this asset is a built-in parametric primitive (no source file). */
+  primitive?: PrimitiveKind;
 }
 
 /** A named group of imported assets (a transformable parent). */
@@ -60,6 +67,8 @@ export interface SerializedAsset {
   referencePath: string;
   missing: boolean;
   groupId: string | null;
+  /** Set when this asset is a built-in parametric primitive (no source file). */
+  primitive?: PrimitiveKind;
 }
 
 export interface SerializedGroup {

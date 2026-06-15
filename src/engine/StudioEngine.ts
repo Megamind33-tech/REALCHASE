@@ -46,6 +46,7 @@ import {
 import {
   AssetImportError, type ImportedAsset, type AssetGroup, type SerializedAsset,
   type SerializedGroup, type SceneSnapshot, type AssetTransform, type ExternalResolver,
+  type PrimitiveKind,
 } from '@/integrations/render-engine/types';
 import { WebXRDefaultExperience } from '@babylonjs/core/XR/webXRDefaultExperience';
 import { BroadcastGraphics } from '@/graphics/BroadcastGraphics';
@@ -85,6 +86,8 @@ interface AssetRecord {
   meshCount: number;
   vertexCount: number;
   groupId: string | null;
+  /** Set when this asset is a built-in parametric primitive (rebuilt from params). */
+  primitive?: PrimitiveKind;
 }
 
 interface GroupRecord {
@@ -563,6 +566,7 @@ export class StudioEngine {
       referencePath: rec.referencePath,
       missing: rec.missing,
       groupId: rec.groupId,
+      primitive: rec.primitive,
     };
   }
 
@@ -630,10 +634,20 @@ export class StudioEngine {
   /** Duplicate an imported asset, offset slightly so the copy is visible. */
   async duplicateAsset(id: string): Promise<ImportedAsset | null> {
     const rec = this.importedAssets.get(id);
-    if (!rec || !rec.bytes) return null; // can't duplicate a missing asset
+    if (!rec) return null;
     const base = this.readTransform(id);
-    const file = new File([rec.bytes], `${rec.name}.${rec.format}`, { type: 'model/gltf-binary' });
-    const dup = await this.importAsset(file);
+    // Primitives are rebuilt from their kind (no source bytes); imported models
+    // are re-imported from the bytes we kept. Missing stubs can't be duplicated.
+    let dup: ImportedAsset | null;
+    if (rec.primitive) {
+      dup = this.addPrimitive(rec.primitive);
+    } else if (rec.bytes) {
+      const file = new File([rec.bytes], `${rec.name}.${rec.format}`, { type: 'model/gltf-binary' });
+      dup = await this.importAsset(file);
+    } else {
+      return null; // missing external asset — nothing to copy
+    }
+    if (!dup) return null;
     this.setAssetTransform(dup.id, {
       position: [base.position[0] + 0.6, base.position[1], base.position[2] + 0.6],
       rotation: base.rotation,
@@ -776,7 +790,7 @@ export class StudioEngine {
         meshCount: rec.meshCount, vertexCount: rec.vertexCount, transform,
         data: embedded && rec.bytes ? bytesToBase64(rec.bytes) : null,
         embedded, referenceMode: rec.referenceMode, referencePath: rec.referencePath,
-        missing: rec.missing, groupId: rec.groupId,
+        missing: rec.missing, groupId: rec.groupId, primitive: rec.primitive,
       };
     });
     const groups: SerializedGroup[] = this.getGroups().map((g) => ({ id: g.id, name: g.name, transform: g.transform, childIds: g.childIds }));
@@ -801,6 +815,21 @@ export class StudioEngine {
     let restored = 0;
     let missing = 0;
     for (const a of snapshot.assets ?? []) {
+      // Built-in primitives carry no source file — rebuild them from their kind.
+      if (a.primitive) {
+        const dup = this.addPrimitive(a.primitive);
+        if (dup) {
+          if (dup.id !== a.id) this.renameAssetId(dup.id, a.id);
+          const rec = this.importedAssets.get(a.id);
+          if (rec) { rec.name = a.name; rec.groupId = a.groupId; rec.transform = a.transform; }
+          const node = this.findMeshById(a.id);
+          if (node?.metadata) node.metadata.displayName = a.name;
+          if (a.groupId) { const gNode = this.findMeshById(a.groupId); if (gNode && node) node.setParent(gNode); }
+          this.setAssetTransform(a.id, a.transform);
+          restored += 1;
+        }
+        continue;
+      }
       let bytes: Uint8Array | null = null;
       if (a.embedded && a.data) bytes = base64ToBytes(a.data);
       else if (this.externalResolver) bytes = await this.externalResolver(a.referencePath).catch(() => null);
@@ -1228,6 +1257,64 @@ export class StudioEngine {
     this.selectObject(objectId);
     this.emitSceneGraph();
     return true;
+  }
+
+  /** Build the actual Babylon mesh for a parametric primitive. */
+  private buildPrimitiveMesh(kind: PrimitiveKind, name: string): Mesh {
+    const scene = this.scene!;
+    switch (kind) {
+      case 'sphere': return MeshBuilder.CreateSphere(name, { diameter: 1, segments: 24 }, scene);
+      case 'cylinder': return MeshBuilder.CreateCylinder(name, { height: 1.2, diameter: 0.9, tessellation: 32 }, scene);
+      case 'plane': { const p = MeshBuilder.CreatePlane(name, { size: 1.4, sideOrientation: Mesh.DOUBLESIDE }, scene); return p; }
+      case 'cone': return MeshBuilder.CreateCylinder(name, { height: 1.2, diameterTop: 0, diameterBottom: 1, tessellation: 32 }, scene);
+      case 'torus': return MeshBuilder.CreateTorus(name, { diameter: 1.1, thickness: 0.35, tessellation: 32 }, scene);
+      case 'box':
+      default: return MeshBuilder.CreateBox(name, { size: 1 }, scene);
+    }
+  }
+
+  /**
+   * Add a built-in parametric primitive (box/sphere/cylinder/plane/cone/torus)
+   * into the stage as a real, selectable, transformable asset — the same record
+   * type as imported GLB models, so transform/rename/duplicate/remove/group and
+   * scene save/restore all work uniformly. It carries no source bytes; it is
+   * rebuilt from its `primitive` kind on reload (never an honest-missing stub).
+   */
+  addPrimitive(kind: PrimitiveKind): ImportedAsset | null {
+    this.markInteraction();
+    if (!this.scene || !this.refs) return null;
+    const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+    const id = this.createUniqueNodeId(label);
+    const mesh = this.buildPrimitiveMesh(kind, id);
+    // Sit it just above the floor, slightly in front of the desk so it's visible.
+    mesh.position.set(0, 1, 1.5);
+    if (kind === 'plane') mesh.rotation.set(0, Math.PI, 0);
+    const mat = new StandardMaterial(`${id}Mat`, this.scene);
+    mat.diffuseColor = new Color3(0.55, 0.58, 0.66);
+    mat.specularColor = new Color3(0.15, 0.15, 0.18);
+    mat.backFaceCulling = kind !== 'plane';
+    mesh.material = mat;
+    mesh.metadata = { chaseId: id, displayName: label, imported: true, primitive: kind };
+
+    const vertexCount = mesh.getTotalVertices?.() ?? 0;
+    this.importedAssets.set(id, {
+      id, name: label, format: 'glb', fileBytes: 0, bytes: null,
+      referenceMode: false, referencePath: '', missing: false,
+      transform: this.readTransform(id), meshCount: 1, vertexCount, groupId: null,
+      primitive: kind,
+    });
+    this.emitSceneGraph();
+    this.selectObject(id);
+    this.emitAssets();
+    return this.describeAsset(id);
+  }
+
+  /** Remove every imported asset and group, releasing their engine resources. */
+  clearImportedAssets(): number {
+    const count = this.importedAssets.size;
+    [...this.assetGroups.keys()].forEach((id) => this.removeGroup(id));
+    [...this.importedAssets.keys()].forEach((id) => this.removeAsset(id));
+    return count;
   }
 
   /**
@@ -1901,6 +1988,50 @@ export class StudioEngine {
       return null;
     } finally {
       if (!wasEnabled) cam.setEnabled(false);
+    }
+  }
+
+  /**
+   * Small framed thumbnail of a single imported asset/group, rendered off-screen
+   * from a temporary camera that frames the asset's bounding sphere. Used for the
+   * Scene Outliner so each row shows what it actually is. Returns null when the
+   * asset has no live geometry (e.g. a missing external stub) so the UI can fall
+   * back to an honest type icon instead of a blank or fake image. CPU/GPU cost is
+   * a single off-screen render per call — callers cache the result per asset.
+   */
+  async captureAssetThumbnail(id: string, size = 96): Promise<string | null> {
+    if (!this.engine || !this.scene) return null;
+    const node = this.findMeshById(id);
+    if (!node) return null;
+    // Collect the asset's renderable meshes (the root + its subtree).
+    const meshes = this.scene.meshes.filter((m) => this.resolveObjectId(m) === id && (m.getTotalVertices?.() ?? 0) > 0);
+    if (meshes.length === 0) return null;
+
+    // World-space bounds of the whole asset, so the framing camera sees all of it.
+    let min = new Vector3(Infinity, Infinity, Infinity);
+    let max = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const m of meshes) {
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      min = Vector3.Minimize(min, bb.minimumWorld);
+      max = Vector3.Maximize(max, bb.maximumWorld);
+    }
+    if (!isFinite(min.x) || !isFinite(max.x)) return null;
+    const center = min.add(max).scale(0.5);
+    const radius = Math.max(0.001, max.subtract(min).length() * 0.5);
+
+    // A throwaway camera looking at the asset from a pleasing 3/4 angle. Framed
+    // off-screen so the live viewport never flickers.
+    const cam = new ArcRotateCamera('assetThumbCam', Math.PI / 4, Math.PI / 2.6, radius * 3.2, center, this.scene);
+    cam.minZ = Math.max(0.01, radius * 0.05);
+    cam.maxZ = radius * 40 + 100;
+    cam.fov = 0.6;
+    try {
+      return await Tools.CreateScreenshotUsingRenderTargetAsync(this.engine, cam, { width: size, height: size });
+    } catch {
+      return null;
+    } finally {
+      cam.dispose();
     }
   }
 

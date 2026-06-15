@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import {
-  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw, Trash2,
+  LayoutGrid, Camera, Sun, User, Scan, Palette, ChevronRight, Move, RotateCw, Maximize2, Box, Folder, Link2, AlertTriangle, RefreshCw, Trash2, Copy,
 } from 'lucide-react';
 import { Tabs, Slider, Toggle } from '@/components/ui/Controls';
 import { useShell } from '@/context/ShellContext';
@@ -282,11 +282,12 @@ const TRANSFORM_TOOLS: { id: TransformMode; icon: typeof Move; label: string }[]
 function AssetInspector({ asset, transformMode, onTransformMode }: {
   asset: ImportedAsset; transformMode: TransformMode; onTransformMode: (mode: TransformMode) => void;
 }) {
-  const { setAssetTransform, setAssetReferenceMode, setAssetReferencePath, relinkAsset, removeAsset } = useEditorBridge();
+  const { setAssetTransform, setAssetReferenceMode, setAssetReferencePath, relinkAsset, removeAsset, duplicateAsset } = useEditorBridge();
   const { dispatch } = useShell();
   const relinkRef = useRef<HTMLInputElement>(null);
   const t = asset.transform;
   const rotDeg: [number, number, number] = [t.rotation[0] * DEG, t.rotation[1] * DEG, t.rotation[2] * DEG];
+  const canDuplicate = !asset.missing;
   return (
     <div
       data-testid="asset-inspector"
@@ -295,6 +296,20 @@ function AssetInspector({ asset, transformMode, onTransformMode }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <Box size={13} style={{ color: 'var(--accent-blue)' }} />
         <span style={{ flex: 1, fontSize: 11, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={asset.name}>{asset.name}</span>
+        <button
+          onClick={() => {
+            void duplicateAsset(asset.id).then((dup) => {
+              dispatch({ type: 'SHOW_TOAST', message: dup ? `Duplicated ${asset.name}` : `Can't duplicate ${asset.name}` });
+            });
+          }}
+          disabled={!canDuplicate}
+          data-testid="duplicate-asset-button"
+          title={canDuplicate ? 'Duplicate this asset' : 'Relink the missing file before duplicating'}
+          aria-label={`Duplicate ${asset.name}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'transparent', color: canDuplicate ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+        >
+          <Copy size={12} />
+        </button>
         <button
           onClick={() => { removeAsset(asset.id); dispatch({ type: 'SHOW_TOAST', message: `Removed ${asset.name}` }); }}
           data-testid="delete-asset-button"

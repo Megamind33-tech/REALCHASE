@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Box, Copy, Trash2, Pencil, AlertTriangle, Link2, FolderPlus, Folder, RefreshCw, Check,
+  Box, Copy, Trash2, Pencil, AlertTriangle, Link2, FolderPlus, Folder, RefreshCw, Check, Trash,
 } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
@@ -8,6 +8,45 @@ import { formatBytes } from '@/integrations/render-engine/assetImport';
 import type { ImportedAsset } from '@/integrations/render-engine/types';
 
 const rowBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex' };
+
+/**
+ * Small live thumbnail for an outliner row, rendered off-screen by the engine
+ * from the asset's own geometry. Falls back to an honest type icon when the
+ * engine can't render one (e.g. a missing external stub). Re-renders when the
+ * asset's transform changes so a moved/scaled asset stays recognisable.
+ */
+function AssetThumb({ asset }: { asset: ImportedAsset }) {
+  const { captureAssetThumbnail, engine } = useEditorBridge();
+  const [url, setUrl] = useState<string | null>(null);
+  const t = asset.transform;
+  const key = `${asset.id}|${asset.vertexCount}|${t.position.join(',')}|${t.scaling.join(',')}`;
+
+  useEffect(() => {
+    let stopped = false;
+    if (asset.missing || !engine) { setUrl(null); return; }
+    void captureAssetThumbnail(asset.id, 72).then((u) => { if (!stopped) setUrl(u); });
+    return () => { stopped = true; };
+    // key folds in the bits that change the rendered look.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, engine]);
+
+  return (
+    <div
+      data-testid={`asset-thumb-${asset.id}`}
+      style={{
+        width: 22, height: 22, flexShrink: 0, borderRadius: 3, overflow: 'hidden',
+        background: 'var(--bg-viewport)', border: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      {url ? (
+        <img src={url} alt={`${asset.name} preview`} data-thumb="asset" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <Box size={12} style={{ color: asset.missing ? 'var(--status-rec)' : 'var(--text-muted)' }} />
+      )}
+    </div>
+  );
+}
 
 function Badges({ a }: { a: ImportedAsset }) {
   return (
@@ -21,15 +60,23 @@ function Badges({ a }: { a: ImportedAsset }) {
 
 export function SceneOutliner() {
   const { state, dispatch } = useShell();
-  const { assets, groups, renameAsset, duplicateAsset, removeAsset, createGroup, removeGroup, relinkAsset } = useEditorBridge();
+  const { assets, groups, renameAsset, duplicateAsset, removeAsset, createGroup, removeGroup, relinkAsset, clearImportedAssets } = useEditorBridge();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [groupName, setGroupName] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
   const relinkRef = useRef<HTMLInputElement>(null);
   const relinkTarget = useRef<string | null>(null);
 
   if (assets.length === 0 && groups.length === 0) return null;
+
+  const doClearAll = () => {
+    const count = clearImportedAssets();
+    setConfirmClear(false);
+    setChecked(new Set());
+    dispatch({ type: 'SHOW_TOAST', message: count > 0 ? `Cleared ${count} imported asset${count === 1 ? '' : 's'}` : 'No imported assets to clear' });
+  };
 
   const toggleCheck = (id: string) => {
     setChecked((prev) => {
@@ -73,7 +120,7 @@ export function SceneOutliner() {
           aria-label={`Select ${a.name}`}
           onChange={() => toggleCheck(a.id)}
         />
-        <Box size={11} style={{ color: a.missing ? 'var(--status-rec)' : 'var(--text-muted)', flexShrink: 0 }} />
+        <AssetThumb asset={a} />
         {editingId === a.id ? (
           <input
             autoFocus
@@ -161,6 +208,38 @@ export function SceneOutliner() {
       })}
 
       {ungrouped.filter((a) => !grouped.has(a.id)).map((a) => <AssetRow key={a.id} a={a} indent={false} />)}
+
+      {assets.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          {confirmClear ? (
+            <div data-testid="clear-all-confirm" style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 9, color: 'var(--text-secondary)' }}>
+              <span style={{ flex: 1 }}>Remove all {assets.length} imported asset{assets.length === 1 ? '' : 's'}?</span>
+              <button
+                data-testid="clear-all-confirm-button"
+                onClick={doClearAll}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, padding: '3px 7px', borderRadius: 3, border: '1px solid var(--status-error)', background: 'transparent', color: 'var(--status-error)' }}
+              >
+                <Trash size={11} /> Clear
+              </button>
+              <button
+                onClick={() => setConfirmClear(false)}
+                style={{ fontSize: 9, padding: '3px 7px', borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--text-secondary)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              data-testid="clear-all-button"
+              onClick={() => setConfirmClear(true)}
+              title="Remove every imported asset and group from the scene"
+              style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 9, padding: '5px 6px', borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--text-muted)' }}
+            >
+              <Trash size={11} /> Clear all imported assets
+            </button>
+          )}
+        </div>
+      )}
 
       <input
         ref={relinkRef}
