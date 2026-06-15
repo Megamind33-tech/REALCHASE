@@ -1662,6 +1662,11 @@ export class StudioEngine {
     rec.mesh.position.set(def.position[0], def.position[1], def.position[2]);
     rec.mesh.rotation.set(def.rotation[0], def.rotation[1], def.rotation[2]);
     rec.mesh.scaling.set(def.scaling[0], def.scaling[1], def.scaling[2]);
+    // Face-camera billboard (card/text only): the flat panel always turns to the
+    // active tracked camera. BILLBOARDMODE_ALL = 7, _NONE = 0.
+    if (def.kind === 'card' || def.kind === 'text') {
+      rec.mesh.billboardMode = def.faceCamera ? Mesh.BILLBOARDMODE_ALL : Mesh.BILLBOARDMODE_NONE;
+    }
     this.styleArMesh(rec, def);
 
     // Floor anchoring: ground the element so its base sits on the studio floor
@@ -1697,7 +1702,17 @@ export class StudioEngine {
     const [r, g, b] = hexToRgb(def.color);
     (rec.contact.material as StandardMaterial).emissiveColor = new Color3(r, g, b);
     rec.contact.position.set(def.position[0], 0.02, def.position[2]);
-    const s = Math.max(0.4, (def.scaling[0] + def.scaling[2]) / 2);
+    // Scale the ring to the element's real ground footprint (world XZ extent of
+    // its bounding box) rather than a raw scale average, so the contact disc hugs
+    // the base of cards, wide score bugs and primitives alike.
+    rec.mesh.computeWorldMatrix(true);
+    const bb = rec.mesh.getBoundingInfo().boundingBox;
+    const spanX = bb.maximumWorld.x - bb.minimumWorld.x;
+    const spanZ = bb.maximumWorld.z - bb.minimumWorld.z;
+    const footprint = Math.max(spanX, spanZ);
+    // Disc base radius is 0.55, so divide to get a multiplier that yields a ring
+    // a touch larger than the footprint.
+    const s = Math.max(0.4, (footprint * 0.62) / 0.55);
     rec.contact.scaling.set(s, s, s);
   }
 

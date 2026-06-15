@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, Crosshair, Volume2, Radio, SquareStack, Settings as SettingsIcon, ScrollText, Square, Sun, Boxes, Trash2 } from 'lucide-react';
+import { Camera, Crosshair, Volume2, Radio, SquareStack, Settings as SettingsIcon, ScrollText, Square, Sun, Boxes, Trash2, ArrowDownToLine, Rss } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { useGraphics } from '@/context/GraphicsContext';
@@ -13,7 +13,7 @@ import { CAMERA_SHOTS } from '@/data/mock/studioData';
 import { LIGHTING_PRESETS, type LightChannel, type LightingSettings } from '@/engine/lighting';
 import { graphicLabel } from '@/graphics/graphicsTypes';
 import { formatClock } from '@/timeline/timelineTypes';
-import { defaultArElement, arKindLabel, arTemplateLabel, defaultFields, type ArElementKind, type ArTemplate } from '@/ar/arTypes';
+import { defaultArElement, arKindLabel, arTemplateLabel, defaultFields, clampDataInterval, parsePastedFields, AR_DATA_MIN_INTERVAL, AR_DATA_MAX_INTERVAL, type ArElement, type ArElementKind, type ArTemplate } from '@/ar/arTypes';
 import type { QualityMode } from '@/context/shellTypes';
 
 const surface: React.CSSProperties = { flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 20, overflowY: 'auto' };
@@ -466,10 +466,25 @@ export function ArWorkspace() {
               <span>Colour</span>
               <input type="color" value={selected.color} onChange={(e) => patchElement(selected.id, { color: e.currentTarget.value })} style={{ width: 44, height: 22, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="AR colour" />
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--text-secondary)', marginBottom: 10 }}>
+            {selected.kind === 'card' && (
+              <ArDataFeedPanel key={selected.id} element={selected} patchElement={patchElement} dispatch={dispatch} />
+            )}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--text-secondary)', marginBottom: 6 }}>
               <input type="checkbox" checked={!!selected.anchorToFloor} onChange={(e) => patchElement(selected.id, { anchorToFloor: e.currentTarget.checked })} aria-label="Anchor to floor" />
               Anchor to studio floor (planted with contact ring)
             </label>
+            <button data-testid="ar-drop-to-floor" onClick={() => { patchElement(selected.id, { anchorToFloor: true }); dispatch({ type: 'SHOW_TOAST', message: `${selected.label || arKindLabel(selected.kind)} dropped to floor.` }); }}
+              disabled={!!selected.anchorToFloor}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '5px 10px', borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'var(--bg-panel-raised)', color: selected.anchorToFloor ? 'var(--text-muted)' : 'var(--text-primary)', marginBottom: 10, opacity: selected.anchorToFloor ? 0.6 : 1 }}>
+              <ArrowDownToLine size={12} style={{ color: 'var(--accent-blue)' }} /> {selected.anchorToFloor ? 'On the floor' : 'Drop to floor'}
+            </button>
+            {(selected.kind === 'card' || selected.kind === 'text') && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                <input type="checkbox" checked={!!selected.faceCamera} onChange={(e) => patchElement(selected.id, { faceCamera: e.currentTarget.checked })} aria-label="Face camera" data-testid="ar-face-camera" />
+                Face camera (billboard — always turns to the active camera)
+              </label>
+            )}
             <ArVec3 label="Position" step={0.1} values={selected.position} onChange={(v) => patchElement(selected.id, { position: v })} />
             <ArVec3 label="Rotation" step={1} toDeg values={selected.rotation} onChange={(v) => patchElement(selected.id, { rotation: v })} />
             <ArVec3 label="Scale" step={0.1} values={selected.scaling} onChange={(v) => patchElement(selected.id, { scaling: v })} />
@@ -479,6 +494,89 @@ export function ArWorkspace() {
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>Select or add an AR element.</div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Live data feed + one-shot field paste for a 'card' AR element. Binds the
+ *  card's `fields` to either an https:// JSON endpoint (polled by ArDataPoller)
+ *  or a pasted JSON / key=value blob applied once. Surfaces honest parse errors
+ *  inline — never fakes success. */
+function ArDataFeedPanel({ element, patchElement, dispatch }: {
+  element: ArElement;
+  patchElement: (id: string, patch: Partial<ArElement>) => void;
+  dispatch: ReturnType<typeof useShell>['dispatch'];
+}) {
+  const [url, setUrl] = useState(element.dataUrl ?? '');
+  const [interval, setInterval] = useState(clampDataInterval(element.dataIntervalSec));
+  const [paste, setPaste] = useState('');
+  const [pasteErr, setPasteErr] = useState<string | null>(null);
+  const live = typeof element.dataUrl === 'string' && /^https:\/\//i.test(element.dataUrl.trim());
+
+  const applyUrl = () => {
+    const trimmed = url.trim();
+    if (!trimmed) { patchElement(element.id, { dataUrl: undefined }); dispatch({ type: 'SHOW_TOAST', message: 'AR feed cleared.' }); return; }
+    if (!/^https:\/\//i.test(trimmed)) { dispatch({ type: 'SHOW_TOAST', message: 'AR feed URL must start with https://' }); return; }
+    patchElement(element.id, { dataUrl: trimmed, dataIntervalSec: clampDataInterval(interval) });
+    dispatch({ type: 'SHOW_TOAST', message: element.onAir ? 'AR feed bound — polling live.' : 'AR feed bound (polls once on air).' });
+  };
+
+  const applyPaste = () => {
+    try {
+      const fields = parsePastedFields(paste);
+      patchElement(element.id, { fields: { ...(element.fields ?? {}), ...fields } });
+      setPaste('');
+      setPasteErr(null);
+      dispatch({ type: 'SHOW_TOAST', message: `Applied ${Object.keys(fields).length} field(s).` });
+    } catch (err) {
+      setPasteErr(err instanceof Error ? err.message : 'Could not parse input.');
+    }
+  };
+
+  const inputStyle: React.CSSProperties = { width: '100%', fontSize: 11, padding: '4px 6px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 3, color: 'var(--text-primary)' };
+
+  return (
+    <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 4, padding: 10, marginBottom: 10, background: 'var(--bg-panel)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <Rss size={12} style={{ color: 'var(--accent-blue)' }} />
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary)' }}>Live data feed</span>
+        {live && <span className="mono" style={{ fontSize: 8, fontWeight: 700, color: element.onAir ? 'var(--status-rec)' : 'var(--text-muted)' }}>{element.onAir ? 'POLLING' : 'IDLE'}</span>}
+      </div>
+      <label style={{ display: 'block', marginBottom: 6 }}>
+        <span style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>JSON endpoint (https://)</span>
+        <input value={url} placeholder="https://example.com/scores.json" aria-label="AR data URL"
+          data-testid="ar-data-url"
+          onChange={(e) => setUrl(e.currentTarget.value)} onBlur={applyUrl}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyUrl(); } }}
+          style={inputStyle} />
+      </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>Every</span>
+        <input type="number" min={AR_DATA_MIN_INTERVAL} max={AR_DATA_MAX_INTERVAL} step={1} value={interval} aria-label="AR poll interval (seconds)"
+          onChange={(e) => { const n = clampDataInterval(parseInt(e.currentTarget.value, 10)); setInterval(n); patchElement(element.id, { dataIntervalSec: n }); }}
+          style={{ ...inputStyle, width: 56 }} />
+        <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>seconds ({AR_DATA_MIN_INTERVAL}–{AR_DATA_MAX_INTERVAL}s)</span>
+      </div>
+      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 10 }}>
+        {live
+          ? 'Top-level JSON keys are mapped into the card fields and redrawn live while on air. Fetch/parse errors appear as a toast.'
+          : 'Paste an https:// URL returning a JSON object to bind the card to live data.'}
+      </div>
+      <label style={{ display: 'block', marginBottom: 6 }}>
+        <span style={{ display: 'block', fontSize: 9, color: 'var(--text-muted)', marginBottom: 2 }}>Or paste data once (JSON object or key=value lines)</span>
+        <textarea value={paste} aria-label="AR paste fields" data-testid="ar-paste-fields"
+          placeholder={'{"value":"72%","caption":"Approval"}\n# or:\nvalue=72%\ncaption=Approval'}
+          onChange={(e) => { setPaste(e.currentTarget.value); if (pasteErr) setPasteErr(null); }}
+          rows={4}
+          style={{ ...inputStyle, fontFamily: 'var(--font-mono, monospace)', resize: 'vertical' }} />
+      </label>
+      {pasteErr && (
+        <div data-testid="ar-paste-error" style={{ fontSize: 9, color: 'var(--status-rec)', marginBottom: 6 }}>{pasteErr}</div>
+      )}
+      <button onClick={applyPaste} disabled={!paste.trim()}
+        style={{ fontSize: 10, padding: '5px 10px', borderRadius: 3, border: '1px solid var(--border-subtle)', background: 'var(--bg-panel-raised)', color: paste.trim() ? 'var(--text-primary)' : 'var(--text-muted)', opacity: paste.trim() ? 1 : 0.6 }}>
+        Apply pasted fields
+      </button>
     </div>
   );
 }
