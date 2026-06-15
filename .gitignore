@@ -32,6 +32,9 @@ src-tauri/target
 # External Forks
 /forks/
 
+# Claude Code local state (agent worktrees, etc.)
+/.claude/
+
 # Generated files
 /auto.crt
 /auto.key
