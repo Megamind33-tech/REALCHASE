@@ -135,7 +135,7 @@ export function Viewport() {
           >
             <Focus size={14} />
           </IconButton>
-          <IconButton label="Toggle grid (not wired yet)" disabled>
+          <IconButton label="Grid overlay — requires an engine grid toggle (not exposed yet)" disabled>
             <Grid3x3 size={14} />
           </IconButton>
           <IconButton

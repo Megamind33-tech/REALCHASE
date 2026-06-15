@@ -72,15 +72,17 @@ export function TopBar() {
         <span style={{ fontWeight: 600, fontSize: 13, letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
           CHASE STUDIO PRO
         </span>
+        {/* The active project name is real state, but switching between saved
+            projects requires the persistent project service. Until then this is
+            a read-only display of the open project — disabled, not faked. */}
         <select
           value={state.projectName}
-          onChange={(e) => dispatch({ type: 'SHOW_TOAST', message: `Switched to ${e.target.value}` })}
+          disabled
+          title="Switching saved projects requires the persistent project service. Use Open Project to load a .chaseproj file."
           style={{ maxWidth: 180, fontSize: 11 }}
-          aria-label="Project selector"
+          aria-label="Active project (read-only until persistent project service)"
         >
-          <option value="Apex Evening Broadcast">Apex Evening Broadcast</option>
-          <option value="Morning Sports Desk">Morning Sports Desk</option>
-          <option value="Talkline Friday">Talkline Friday</option>
+          <option value={state.projectName}>{state.projectName}</option>
         </select>
       </div>
 
@@ -88,8 +90,10 @@ export function TopBar() {
         <Button onClick={() => void saveProject()}><Save size={14} /> Save Project</Button>
         <Button onClick={() => openRef.current?.click()}><FolderOpen size={14} /> Open Project</Button>
         <input ref={openRef} type="file" accept=".chaseproj,application/json" hidden onChange={(e) => void openProject(e.currentTarget.files?.[0])} />
-        <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'New' })}><FilePlus size={14} /> New</Button>
-        <Button onClick={() => dispatch({ type: 'FILE_ACTION', action: 'Import' })}><Upload size={14} /> Import</Button>
+        {/* New / Import need the persistent project service to do real work.
+            Disabled honestly rather than firing a no-op toast. */}
+        <Button disabled title="New project requires the persistent project service (not connected). Use Open Project to load a saved .chaseproj." aria-label="New project (requires project service)"><FilePlus size={14} /> New</Button>
+        <Button disabled title="Import requires the persistent project service (not connected). Use Open Project, or add sources in the Switcher." aria-label="Import (requires project service)"><Upload size={14} /> Import</Button>
       </div>
 
       <div style={{ display: 'flex', gap: 2 }}>

@@ -510,8 +510,25 @@ export function SettingsWorkspace() {
         </div>
         <div style={card}>
           <div className="section-label" style={{ marginBottom: 8 }}>Project</div>
-          <Toggle label="Automatic backup" checked={state.backupEnabled} onChange={() => dispatch({ type: 'TOGGLE_BACKUP' })} />
-          <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 8 }}>Autosave interval: <span className="mono">{state.autosaveMinutes} min</span></div>
+          {/* Automatic backup / autosave need the persistent project service.
+              Rendered as an honestly-disabled switch so it never implies
+              backups are running. Use Save Project in the toolbar instead. */}
+          <label
+            title="Automatic backup requires the persistent project service (not connected). Use Save Project in the toolbar to write a .chaseproj file manually."
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, fontSize: 10, color: 'var(--text-muted)', cursor: 'not-allowed' }}
+          >
+            Automatic backup
+            <button
+              role="switch"
+              aria-checked={false}
+              disabled
+              aria-label="Automatic backup (requires persistent project service)"
+              style={{ width: 28, height: 14, borderRadius: 7, background: 'var(--border-active)', position: 'relative', opacity: 0.5, cursor: 'not-allowed' }}
+            >
+              <span style={{ position: 'absolute', top: 2, left: 2, width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
+            </button>
+          </label>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 8 }}>Autosave disabled until persistent project service is scheduled. Save manually from the toolbar.</div>
           <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 4 }}>Active project: <span className="mono">{state.projectName}</span></div>
         </div>
       </div>
