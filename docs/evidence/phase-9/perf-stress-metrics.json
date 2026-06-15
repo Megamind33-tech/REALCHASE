@@ -1,0 +1,262 @@
+{
+  "outcome": "pass",
+  "startedAt": "2026-06-15T05:47:27.246Z",
+  "finishedAt": "2026-06-15T05:47:42.133Z",
+  "baseUrl": "http://127.0.0.1:1420",
+  "config": {
+    "SAMPLE_INTERVAL_MS": 500,
+    "STRESS_DURATION_MS": 12000,
+    "IMPORT_ROUNDS": 3,
+    "MIN_MEDIAN_FPS": 5
+  },
+  "chromiumArgs": [
+    "--use-gl=angle",
+    "--use-angle=swiftshader",
+    "--enable-unsafe-swiftshader",
+    "--ignore-gpu-blocklist"
+  ],
+  "stressLog": [
+    "import round 1: 1 asset(s) in scene",
+    "import round 2: 4 asset(s) in scene",
+    "import round 3: 7 asset(s) in scene"
+  ],
+  "sampleCount": 22,
+  "fps": {
+    "median": 6,
+    "min": 4,
+    "max": 9,
+    "mean": 6.36
+  },
+  "heap": {
+    "available": true,
+    "startUsedMB": 29.58,
+    "endUsedMB": 29.67,
+    "peakUsedMB": 34.16,
+    "limitMB": 4095.75
+  },
+  "pageErrors": [],
+  "consoleErrors": [],
+  "crashed": false,
+  "samples": [
+    {
+      "t": 58,
+      "camera": "cam1",
+      "fps": 4,
+      "heap": {
+        "usedJSHeapMB": 29.58,
+        "totalJSHeapMB": 44.18,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 584,
+      "camera": "cam2",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 32.05,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 1130,
+      "camera": "cam3",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 28.45,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 1653,
+      "camera": "cam4",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 30.53,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 2181,
+      "camera": "cam5",
+      "fps": 6,
+      "heap": {
+        "usedJSHeapMB": 33.13,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 2706,
+      "camera": "cam6",
+      "fps": 6,
+      "heap": {
+        "usedJSHeapMB": 27.26,
+        "totalJSHeapMB": 44.45,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 3257,
+      "camera": "cam1",
+      "fps": 7,
+      "heap": {
+        "usedJSHeapMB": 31.06,
+        "totalJSHeapMB": 44.45,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 3810,
+      "camera": "cam2",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 32.34,
+        "totalJSHeapMB": 44.45,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 4382,
+      "camera": "cam3",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 26.5,
+        "totalJSHeapMB": 43.94,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 4904,
+      "camera": "cam4",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 27.23,
+        "totalJSHeapMB": 43.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 5441,
+      "camera": "cam5",
+      "fps": 9,
+      "heap": {
+        "usedJSHeapMB": 28.79,
+        "totalJSHeapMB": 43.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 5967,
+      "camera": "cam6",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 29.81,
+        "totalJSHeapMB": 43.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 6513,
+      "camera": "cam1",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 31.39,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 7035,
+      "camera": "cam2",
+      "fps": 8,
+      "heap": {
+        "usedJSHeapMB": 31.97,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 7581,
+      "camera": "cam3",
+      "fps": 7,
+      "heap": {
+        "usedJSHeapMB": 33.18,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 8127,
+      "camera": "cam4",
+      "fps": 6,
+      "heap": {
+        "usedJSHeapMB": 34.16,
+        "totalJSHeapMB": 44.2,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 8684,
+      "camera": "cam5",
+      "fps": 6,
+      "heap": {
+        "usedJSHeapMB": 27.41,
+        "totalJSHeapMB": 44.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 9205,
+      "camera": "cam6",
+      "fps": 6,
+      "heap": {
+        "usedJSHeapMB": 28.02,
+        "totalJSHeapMB": 44.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 10380,
+      "camera": "cam1",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 30.5,
+        "totalJSHeapMB": 45.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 10911,
+      "camera": "cam2",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 28.35,
+        "totalJSHeapMB": 45.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 11440,
+      "camera": "cam3",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 28.99,
+        "totalJSHeapMB": 45.95,
+        "limitJSHeapMB": 4095.75
+      }
+    },
+    {
+      "t": 11964,
+      "camera": "cam4",
+      "fps": 5,
+      "heap": {
+        "usedJSHeapMB": 29.67,
+        "totalJSHeapMB": 45.95,
+        "limitJSHeapMB": 4095.75
+      }
+    }
+  ]
+}
