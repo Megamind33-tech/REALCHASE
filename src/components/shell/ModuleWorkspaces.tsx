@@ -13,7 +13,7 @@ import { CAMERA_SHOTS } from '@/data/mock/studioData';
 import { LIGHTING_PRESETS, type LightChannel, type LightingSettings } from '@/engine/lighting';
 import { graphicLabel } from '@/graphics/graphicsTypes';
 import { formatClock } from '@/timeline/timelineTypes';
-import { defaultArElement, arKindLabel, type ArElementKind } from '@/ar/arTypes';
+import { defaultArElement, arKindLabel, arTemplateLabel, defaultFields, type ArElementKind, type ArTemplate } from '@/ar/arTypes';
 import type { QualityMode } from '@/context/shellTypes';
 
 const surface: React.CSSProperties = { flex: 1, minHeight: 0, background: 'var(--bg-viewport)', padding: 20, overflowY: 'auto' };
@@ -428,14 +428,47 @@ export function ArWorkspace() {
             </div>
             {(selected.kind === 'card' || selected.kind === 'text') && (
               <label style={{ display: 'block', marginBottom: 8 }}>
-                <span style={{ display: 'block', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 3 }}>Label</span>
+                <span style={{ display: 'block', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 3 }}>{selected.template === 'clock' ? 'Caption' : 'Label'}</span>
                 <input value={selected.label} onChange={(e) => patchElement(selected.id, { label: e.currentTarget.value })} aria-label="AR label"
                   style={{ width: '100%', fontSize: 11, padding: '4px 6px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 3, color: 'var(--text-primary)' }} />
               </label>
             )}
+
+            {selected.kind === 'card' && (
+              <>
+                <label style={{ display: 'block', marginBottom: 8 }}>
+                  <span style={{ display: 'block', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 3 }}>Data template</span>
+                  <select value={selected.template ?? 'plain'} aria-label="AR template"
+                    onChange={(e) => { const t = e.currentTarget.value as ArTemplate; patchElement(selected.id, { template: t, fields: defaultFields(t) }); }}
+                    style={{ width: '100%', fontSize: 11, padding: '4px 6px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 3, color: 'var(--text-primary)' }}>
+                    {(['plain', 'stat', 'scorebug', 'clock'] as ArTemplate[]).map((t) => <option key={t} value={t}>{arTemplateLabel(t)}</option>)}
+                  </select>
+                </label>
+                {selected.template === 'clock' && (
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', marginBottom: 8 }}>Live data — the card shows the current time and updates every second on air.</div>
+                )}
+                {selected.template && selected.template !== 'plain' && selected.template !== 'clock' && (
+                  <div style={{ marginBottom: 8 }}>
+                    {Object.keys(selected.fields ?? defaultFields(selected.template)).map((key) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <span style={{ width: 80, fontSize: 9, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{key}</span>
+                        <input value={(selected.fields ?? {})[key] ?? ''} aria-label={`AR field ${key}`}
+                          onChange={(e) => patchElement(selected.id, { fields: { ...(selected.fields ?? {}), [key]: e.currentTarget.value } })}
+                          style={{ flex: 1, fontSize: 11, padding: '3px 6px', background: 'var(--bg-panel)', border: '1px solid var(--border-subtle)', borderRadius: 3, color: 'var(--text-primary)' }} />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-secondary)', marginBottom: 10 }}>
               <span>Colour</span>
               <input type="color" value={selected.color} onChange={(e) => patchElement(selected.id, { color: e.currentTarget.value })} style={{ width: 44, height: 22, padding: 0, border: '1px solid var(--border-subtle)' }} aria-label="AR colour" />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--text-secondary)', marginBottom: 10 }}>
+              <input type="checkbox" checked={!!selected.anchorToFloor} onChange={(e) => patchElement(selected.id, { anchorToFloor: e.currentTarget.checked })} aria-label="Anchor to floor" />
+              Anchor to studio floor (planted with contact ring)
             </label>
             <ArVec3 label="Position" step={0.1} values={selected.position} onChange={(v) => patchElement(selected.id, { position: v })} />
             <ArVec3 label="Rotation" step={1} toDeg values={selected.rotation} onChange={(v) => patchElement(selected.id, { rotation: v })} />

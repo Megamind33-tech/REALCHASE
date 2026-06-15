@@ -192,7 +192,11 @@ export class StudioEngine {
   private xr: WebXRDefaultExperience | null = null;
   private xrMode: XRMode | null = null;
   private arRoot: TransformNode | null = null;
-  private arElements = new Map<string, { mesh: Mesh; kind: string; texture: DynamicTexture | null; material: StandardMaterial }>();
+  private arElements = new Map<string, {
+    mesh: Mesh; kind: string; texture: DynamicTexture | null; material: StandardMaterial;
+    contact: Mesh | null; def: ArElement; lastClock: string;
+  }>();
+  private arClockObserver: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private listeners = new Set<StudioEngineListener>();
   private refs: DeskSceneRefs | null = null;
@@ -1558,26 +1562,76 @@ export class StudioEngine {
     return { mesh, texture, material: mat };
   }
 
-  private styleArMesh(rec: { mesh: Mesh; kind: string; texture: DynamicTexture | null; material: StandardMaterial }, def: ArElement) {
-    const [r, g, b] = hexToRgb(def.color);
-    if (rec.texture) {
-      // Redraw the label panel.
-      const tex = rec.texture;
-      const size = tex.getSize();
-      const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
-      ctx.clearRect(0, 0, size.width, size.height);
-      if (def.kind === 'card') {
-        ctx.fillStyle = 'rgba(8,12,20,0.82)';
-        ctx.fillRect(0, 0, size.width, size.height);
+  private drawArCard(tex: DynamicTexture, def: ArElement) {
+    const size = tex.getSize();
+    const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+    const W = size.width, H = size.height;
+    const f = def.fields ?? {};
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(8,12,20,0.85)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = def.color;
+    ctx.fillRect(0, 0, 14, H); // accent bar
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    switch (def.template ?? 'plain') {
+      case 'stat': {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 150px Inter, sans-serif';
+        ctx.fillText(f.value ?? '—', 40, H * 0.62, W - 60);
         ctx.fillStyle = def.color;
-        ctx.fillRect(0, 0, 14, size.height); // accent bar
+        ctx.font = '40px Inter, sans-serif';
+        ctx.fillText((f.caption ?? def.label ?? '').toUpperCase(), 42, H * 0.86, W - 60);
+        break;
+      }
+      case 'scorebug': {
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 56px Inter, sans-serif';
-        ctx.fillText(def.label || '', 40, 120, size.width - 60);
+        ctx.fillText(f.home ?? 'HOME', 40, 110, W * 0.5 - 50);
+        ctx.fillText(f.away ?? 'AWAY', 40, 230, W * 0.5 - 50);
+        ctx.textAlign = 'right';
         ctx.fillStyle = def.color;
-        ctx.font = '32px Inter, sans-serif';
-        ctx.fillText('AR · LIVE', 40, 200, size.width - 60);
+        ctx.font = 'bold 90px Inter, sans-serif';
+        ctx.fillText(f.homeScore ?? '0', W - 40, 120);
+        ctx.fillText(f.awayScore ?? '0', W - 40, 240);
+        ctx.textAlign = 'left';
+        break;
+      }
+      case 'clock': {
+        const now = new Date();
+        const t = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 150px JetBrains Mono, monospace';
+        ctx.fillText(t, 40, H * 0.62, W - 60);
+        ctx.fillStyle = def.color;
+        ctx.font = '36px Inter, sans-serif';
+        ctx.fillText((def.label || 'LIVE').toUpperCase(), 42, H * 0.88, W - 60);
+        break;
+      }
+      default: { // plain
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 72px Inter, sans-serif';
+        ctx.fillText(def.label || '', 40, H * 0.5, W - 60);
+        ctx.fillStyle = def.color;
+        ctx.font = '34px Inter, sans-serif';
+        ctx.fillText('AR · LIVE', 42, H * 0.78, W - 60);
+      }
+    }
+    tex.update();
+  }
+
+  private styleArMesh(rec: { texture: DynamicTexture | null; material: StandardMaterial }, def: ArElement) {
+    const [r, g, b] = hexToRgb(def.color);
+    if (rec.texture) {
+      if (def.kind === 'card') {
+        this.drawArCard(rec.texture, def);
       } else {
+        // 3D text
+        const tex = rec.texture;
+        const size = tex.getSize();
+        const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
+        ctx.clearRect(0, 0, size.width, size.height);
         ctx.fillStyle = def.color;
         ctx.font = 'bold 110px Impact, Inter, sans-serif';
         ctx.textAlign = 'center';
@@ -1585,8 +1639,8 @@ export class StudioEngine {
         ctx.fillText(def.label || '', size.width / 2, size.height / 2, size.width - 20);
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
+        tex.update();
       }
-      tex.update();
     } else {
       rec.material.diffuseColor = new Color3(r, g, b);
       rec.material.emissiveColor = new Color3(r * 0.25, g * 0.25, b * 0.25);
@@ -1597,18 +1651,74 @@ export class StudioEngine {
   upsertArElement(def: ArElement): void {
     if (!this.scene || !this.arRoot) return;
     let rec = this.arElements.get(def.id);
-    if (rec && rec.kind !== def.kind) { rec.mesh.dispose(); rec.texture?.dispose(); this.arElements.delete(def.id); rec = undefined; }
+    if (rec && rec.kind !== def.kind) { this.removeArElement(def.id); rec = undefined; }
     if (!rec) {
       const built = this.buildArMesh(def);
       built.mesh.parent = this.arRoot;
-      rec = { mesh: built.mesh, kind: def.kind, texture: built.texture, material: built.material };
+      rec = { mesh: built.mesh, kind: def.kind, texture: built.texture, material: built.material, contact: null, def, lastClock: '' };
       this.arElements.set(def.id, rec);
     }
+    rec.def = def;
     rec.mesh.position.set(def.position[0], def.position[1], def.position[2]);
     rec.mesh.rotation.set(def.rotation[0], def.rotation[1], def.rotation[2]);
     rec.mesh.scaling.set(def.scaling[0], def.scaling[1], def.scaling[2]);
     this.styleArMesh(rec, def);
+
+    // Floor anchoring: ground the element so its base sits on the studio floor
+    // (y = 0) and show a contact ring; keeps it planted under camera tracking.
+    if (def.anchorToFloor) {
+      rec.mesh.computeWorldMatrix(true);
+      const minY = rec.mesh.getBoundingInfo().boundingBox.minimumWorld.y;
+      rec.mesh.position.y -= minY; // lift bottom to the floor
+      this.ensureArContact(rec, def);
+    } else if (rec.contact) {
+      rec.contact.dispose();
+      rec.contact = null;
+    }
+
     rec.mesh.setEnabled(def.onAir); // on-air = visible in Program output
+    rec.contact?.setEnabled(def.onAir && !!def.anchorToFloor);
+    this.updateArClockObserver();
+  }
+
+  private ensureArContact(rec: { mesh: Mesh; contact: Mesh | null }, def: ArElement) {
+    if (!this.scene || !this.arRoot) return;
+    if (!rec.contact) {
+      const disc = MeshBuilder.CreateDisc(`arContact-${def.id}`, { radius: 0.55, tessellation: 40 }, this.scene);
+      disc.rotation.x = Math.PI / 2; // lay flat on the floor
+      disc.parent = this.arRoot;
+      const mat = new StandardMaterial(`arContactMat-${def.id}`, this.scene);
+      mat.emissiveColor = new Color3(...hexToRgb(def.color));
+      mat.alpha = 0.32;
+      mat.backFaceCulling = false;
+      disc.material = mat;
+      rec.contact = disc;
+    }
+    const [r, g, b] = hexToRgb(def.color);
+    (rec.contact.material as StandardMaterial).emissiveColor = new Color3(r, g, b);
+    rec.contact.position.set(def.position[0], 0.02, def.position[2]);
+    const s = Math.max(0.4, (def.scaling[0] + def.scaling[2]) / 2);
+    rec.contact.scaling.set(s, s, s);
+  }
+
+  /** Per-frame redraw of live 'clock' cards (throttled to once per second). */
+  private updateArClockObserver() {
+    if (!this.scene) return;
+    const hasClock = [...this.arElements.values()].some((r) => r.def.kind === 'card' && r.def.template === 'clock' && r.def.onAir);
+    if (hasClock && !this.arClockObserver) {
+      this.arClockObserver = this.scene.onBeforeRenderObservable.add(() => {
+        const stamp = String(Math.floor(Date.now() / 1000));
+        for (const r of this.arElements.values()) {
+          if (r.def.kind === 'card' && r.def.template === 'clock' && r.def.onAir && r.texture && r.lastClock !== stamp) {
+            r.lastClock = stamp;
+            this.drawArCard(r.texture, r.def);
+          }
+        }
+      });
+    } else if (!hasClock && this.arClockObserver) {
+      this.scene.onBeforeRenderObservable.remove(this.arClockObserver);
+      this.arClockObserver = null;
+    }
   }
 
   removeArElement(id: string): void {
@@ -1616,7 +1726,9 @@ export class StudioEngine {
     if (!rec) return;
     rec.mesh.dispose();
     rec.texture?.dispose();
+    rec.contact?.dispose();
     this.arElements.delete(id);
+    this.updateArClockObserver();
   }
 
   clearArElements(): void {

@@ -11,7 +11,8 @@
 - **Verification (this pass):** `tsc -b` clean; anti-demo smoke passes.
 - **Known blocker:** Production `vite build` exceeded 304.5s without output on the OneDrive workstation (builds ~2.5–3 min in CI/Linux). Do not report the production bundle as passing on that workstation until resolved.
 - **Post-milestone hardening (done since M8):** revived all 6 placeholder module screens into real workspaces; asset/group delete (button + Delete key); graphic font selection; headset WebXR *preview* (relabelled — not broadcast AR); **real Web Audio mixer** (per-source fader/mute/solo + master into the recorded/streamed bus).
-- **DONE — Broadcast AR (Zero Density-style):** world-anchored AR elements (card/3D-text/box/sphere/cylinder) in a new **AR module**, toggled on-air into the Program composite, locked to the set under FreeD tracking (no headset). Engine `upsertArElement`/`removeArElement`; `ArContext` + `ArSync` persist/replay. Future: floor-plane snapping + data-bound AR templates.
+- **DONE — Broadcast AR (Zero Density-style):** world-anchored AR elements (card/3D-text/box/sphere/cylinder) in a new **AR module**, toggled on-air into the Program composite, locked to the set under FreeD tracking (no headset). Engine `upsertArElement`/`removeArElement`; `ArContext` + `ArSync` persist/replay.
+- **DONE — AR floor anchoring + data templates:** "Anchor to studio floor" grounds elements (base on y=0) with a contact ring; AR Data Cards have Plain/Stat/Score Bug/Live Clock templates with editable fields; the Live Clock card redraws every second on air. Future: snap to a tracked floor plane from the camera feed, and external data feeds (live scores/stats).
 - **Then:** M9 (performance & stress testing), M10 (final polish). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  

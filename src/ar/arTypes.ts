@@ -8,6 +8,9 @@
 
 export type ArElementKind = 'card' | 'box' | 'sphere' | 'cylinder' | 'text';
 
+/** Data template for 'card' elements. 'clock' is live (engine redraws it). */
+export type ArTemplate = 'plain' | 'stat' | 'scorebug' | 'clock';
+
 export interface ArElement {
   id: string;
   kind: ArElementKind;
@@ -18,6 +21,13 @@ export interface ArElement {
   scaling: [number, number, number];
   /** When true the element is enabled in the scene → visible in Program output. */
   onAir: boolean;
+  /** Ground the element so its base sits on the studio floor (y = 0), with a
+   *  contact ring. Keeps it planted as the tracked camera moves. */
+  anchorToFloor?: boolean;
+  /** Card data template (ignored for primitive kinds). */
+  template?: ArTemplate;
+  /** Data fields bound into the template (stat value, team names/scores, …). */
+  fields?: Record<string, string>;
 }
 
 export function makeArId(): string {
@@ -34,6 +44,25 @@ export function arKindLabel(kind: ArElementKind): string {
   }
 }
 
+export function arTemplateLabel(t: ArTemplate): string {
+  switch (t) {
+    case 'plain': return 'Plain';
+    case 'stat': return 'Stat';
+    case 'scorebug': return 'Score Bug';
+    case 'clock': return 'Live Clock';
+  }
+}
+
+/** Default data fields for each card template. */
+export function defaultFields(t: ArTemplate): Record<string, string> {
+  switch (t) {
+    case 'stat': return { value: '72%', caption: 'Approval' };
+    case 'scorebug': return { home: 'HOME', homeScore: '0', away: 'AWAY', awayScore: '0' };
+    case 'clock': return {};
+    case 'plain': return {};
+  }
+}
+
 export function defaultArElement(kind: ArElementKind): ArElement {
   return {
     id: makeArId(),
@@ -45,5 +74,9 @@ export function defaultArElement(kind: ArElementKind): ArElement {
     rotation: [0, 0, 0],
     scaling: [1, 1, 1],
     onAir: false,
+    anchorToFloor: false,
+    template: kind === 'card' ? 'plain' : undefined,
+    fields: kind === 'card' ? {} : undefined,
   };
 }
+

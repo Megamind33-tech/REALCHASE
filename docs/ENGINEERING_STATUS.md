@@ -1,5 +1,18 @@
 # CHASE STUDIO PRO — Engineering Status Report
 
+## Broadcast AR — Floor Anchoring + Data Templates (2026-06-15)
+
+- **Floor anchoring:** per-element "Anchor to studio floor" grounds the element
+  so its base sits on y = 0 (computed from world bounds) and adds a colour
+  **contact ring** on the floor — it stays planted as the tracked camera moves.
+- **Data-bound card templates:** AR Data Cards now support **Plain, Stat, Score
+  Bug, and Live Clock** templates with editable data fields (stat value/caption,
+  team names + scores). **Live Clock** is genuinely live — the engine redraws the
+  card's DynamicTexture once per second while on air (throttled observer).
+- Engine: template-aware card drawing (`drawArCard`), floor grounding + contact
+  ring (`ensureArContact`), and a clock redraw observer (`updateArClockObserver`)
+  that only runs while a clock card is on air.
+
 ## Broadcast AR Pass (2026-06-14) — the real AR
 
 - Implemented **broadcast AR** (Zero Density / Reality-Engine style), distinct
