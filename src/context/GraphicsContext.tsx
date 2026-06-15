@@ -17,6 +17,8 @@ interface GraphicsContextValue {
   selectGraphic: (id: string | null) => void;
   setOnAir: (id: string, on: boolean) => void;
   isOnAir: (id: string) => boolean;
+  /** Replace all graphics from a loaded project. Restored items are off-air. */
+  restoreGraphics: (items: GraphicItem[]) => void;
 }
 
 const GraphicsContext = createContext<GraphicsContextValue | null>(null);
@@ -51,9 +53,15 @@ export function GraphicsProvider({ children }: { children: ReactNode }) {
 
   const isOnAir = useCallback((id: string) => onAirIds.includes(id), [onAirIds]);
 
+  const restoreGraphics = useCallback((items: GraphicItem[]) => {
+    setGraphics(items);
+    setOnAirIds([]); // never auto-go-on-air from a loaded file
+    setSelectedId(null);
+  }, []);
+
   return (
     <GraphicsContext.Provider
-      value={{ graphics, selectedId, onAirIds, addGraphic, removeGraphic, patchGraphic, selectGraphic, setOnAir, isOnAir }}
+      value={{ graphics, selectedId, onAirIds, addGraphic, removeGraphic, patchGraphic, selectGraphic, setOnAir, isOnAir, restoreGraphics }}
     >
       {children}
     </GraphicsContext.Provider>
