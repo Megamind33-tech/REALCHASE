@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Search, Filter, ChevronLeft, Box, Monitor, Lamp, Circle, Leaf, Armchair, Upload } from 'lucide-react';
+import { Search, Filter, ChevronLeft, Box, Monitor, Lamp, Circle, Leaf, Armchair, Upload, Cylinder, Square, Triangle, Donut } from 'lucide-react';
 import { useShell } from '@/context/ShellContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
 import { Tabs, Chip } from '@/components/ui/Controls';
@@ -8,7 +8,16 @@ import {
   CATEGORIES, STUDIO_PACKS, SCENE_OBJECTS, LIGHTING_PRESETS,
 } from '@/data/mock/studioData';
 import type { AssetTab } from '@/context/shellTypes';
-import { AssetImportError } from '@/integrations/render-engine/types';
+import { AssetImportError, PRIMITIVE_KINDS, type PrimitiveKind } from '@/integrations/render-engine/types';
+
+const PRIMITIVE_META: Record<PrimitiveKind, { label: string; icon: typeof Box }> = {
+  box: { label: 'Box', icon: Box },
+  sphere: { label: 'Sphere', icon: Circle },
+  cylinder: { label: 'Cylinder', icon: Cylinder },
+  plane: { label: 'Plane', icon: Square },
+  cone: { label: 'Cone', icon: Triangle },
+  torus: { label: 'Torus', icon: Donut },
+};
 
 const objectIcons: Record<string, typeof Box> = {
   desk: Box,
@@ -21,24 +30,44 @@ const objectIcons: Record<string, typeof Box> = {
 
 export function AssetPanel() {
   const { state, dispatch } = useShell();
-  const { addObject, importAsset } = useEditorBridge();
+  const { addObject, addPrimitive, importAsset } = useEditorBridge();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const importFiles = async (files: File[]) => {
     const candidates = files.filter((f) => f.size >= 0);
     if (candidates.length === 0) return;
+    // Per-file feedback: tally successes/failures so a multi-file drop reports
+    // exactly which models came in and which were rejected (and why).
+    let ok = 0;
+    const failures: string[] = [];
     for (const file of candidates) {
       try {
         const asset = await importAsset(file);
+        ok += 1;
         dispatch({ type: 'SHOW_TOAST', message: `Imported ${asset.name} — ${asset.meshCount} mesh${asset.meshCount === 1 ? '' : 'es'}, ${asset.vertexCount.toLocaleString()} verts` });
       } catch (error) {
         // Precise, honest failure states per the typed import errors.
         const message = error instanceof AssetImportError
           ? error.message
           : error instanceof Error ? error.message : 'Unable to import asset';
+        failures.push(`${file.name}: ${message}`);
         dispatch({ type: 'SHOW_TOAST', message });
       }
     }
+    if (candidates.length > 1) {
+      dispatch({
+        type: 'SHOW_TOAST',
+        message: `Import finished — ${ok} of ${candidates.length} loaded${failures.length ? `, ${failures.length} failed` : ''}`,
+      });
+    }
+  };
+
+  const handleAddPrimitive = (kind: PrimitiveKind) => {
+    const asset = addPrimitive(kind);
+    dispatch({
+      type: 'SHOW_TOAST',
+      message: asset ? `Added ${asset.name} to the scene` : 'Scene engine not ready yet',
+    });
   };
 
   if (state.activeModule !== 'builder' || state.leftPanelCollapsed) return null;
@@ -213,6 +242,39 @@ export function AssetPanel() {
               aria-label={`${preset.name} (not wired yet)`}
             />
           ))}
+        </div>
+
+        <div data-testid="primitive-palette">
+          <div className="section-label" style={{ marginBottom: 6 }}>Add Primitive Shape</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 16 }}>
+            {PRIMITIVE_KINDS.map((kind) => {
+              const { label, icon: Icon } = PRIMITIVE_META[kind];
+              return (
+                <button
+                  key={kind}
+                  data-testid={`add-primitive-${kind}`}
+                  onClick={() => handleAddPrimitive(kind)}
+                  disabled={!state.engineReady}
+                  title={state.engineReady ? `Add a ${label.toLowerCase()} to the scene` : 'Scene engine not ready yet'}
+                  style={{
+                    padding: '8px 4px',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 3,
+                    background: 'var(--bg-panel-raised)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 9,
+                    color: state.engineReady ? 'var(--text-secondary)' : 'var(--text-muted)',
+                  }}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div data-testid="asset-import-panel">

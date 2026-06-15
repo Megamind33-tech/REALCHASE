@@ -31,7 +31,7 @@ export function ScenesPanel() {
       return;
     }
     const nodes = captureNodeTransforms();
-    const thumbnail = await captureSceneThumbnail(320);
+    const thumbnail = await captureSceneThumbnail(640);
     const now = Date.now();
     const scene: SavedScene = {
       id: makeSceneId(),
@@ -62,7 +62,7 @@ export function ScenesPanel() {
   const handleUpdateThumbnail = async (scene: SavedScene) => {
     if (!engineReady) return;
     const nodes = captureNodeTransforms();
-    const thumbnail = await captureSceneThumbnail(320);
+    const thumbnail = await captureSceneThumbnail(640);
     updateScene(scene.id, {
       thumbnail,
       snapshot: { nodes, activeCameraId: getActiveCameraId() },

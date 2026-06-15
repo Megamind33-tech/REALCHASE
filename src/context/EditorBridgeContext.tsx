@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { StudioEngine, type TrackingStatus, type XRMode } from '@/engine/StudioEngine';
 import type { SceneNodeInfo, CameraId } from '@/engine/sceneRegistry';
-import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform } from '@/integrations/render-engine/types';
+import type { ImportedAsset, AssetGroup, SceneSnapshot, AssetTransform, PrimitiveKind } from '@/integrations/render-engine/types';
 import type { GraphicItem } from '@/graphics/graphicsTypes';
 import type { NodeTransform } from '@/scenes/sceneTypes';
 import type { ArElement } from '@/ar/arTypes';
@@ -34,8 +34,11 @@ interface EditorBridgeValue {
   trackingLabel: string;
   captureOutputStream: (fps?: number) => MediaStream | null;
   captureCameraThumbnail: (cameraId: CameraId, width?: number) => Promise<string | null>;
+  captureAssetThumbnail: (id: string, size?: number) => Promise<string | null>;
   sampleKeyColor: () => string | null;
   addObject: (objectId: string) => boolean;
+  addPrimitive: (kind: PrimitiveKind) => ImportedAsset | null;
+  clearImportedAssets: () => number;
   loadPack: (packId: string, onProgress?: (value: number) => void) => Promise<number>;
   importGltfFiles: (files: File[]) => Promise<number>;
   importAsset: (file: File) => Promise<ImportedAsset>;
@@ -214,11 +217,17 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
 
   const captureCameraThumbnail = useCallback((cameraId: CameraId, width?: number) => engineRef.current?.captureCameraThumbnail(cameraId, width) ?? Promise.resolve(null), []);
 
+  const captureAssetThumbnail = useCallback((id: string, size?: number) => engineRef.current?.captureAssetThumbnail(id, size) ?? Promise.resolve(null), []);
+
   const sampleKeyColor = useCallback(() => engineRef.current?.sampleProgramKeyColor() ?? null, []);
 
   const addObject = useCallback((objectId: string) => {
     return engineRef.current?.addSceneObject(objectId) ?? false;
   }, []);
+
+  const addPrimitive = useCallback((kind: PrimitiveKind) => engineRef.current?.addPrimitive(kind) ?? null, []);
+
+  const clearImportedAssets = useCallback(() => engineRef.current?.clearImportedAssets() ?? 0, []);
 
   const loadPack = useCallback((packId: string, onProgress?: (value: number) => void) => {
     const engine = engineRef.current;
@@ -329,8 +338,11 @@ export function EditorBridgeProvider({ children }: { children: ReactNode }) {
         trackingLabel: TRACKING_LABELS[trackingStatus],
         captureOutputStream,
         captureCameraThumbnail,
+        captureAssetThumbnail,
         sampleKeyColor,
         addObject,
+        addPrimitive,
+        clearImportedAssets,
         loadPack,
         importGltfFiles,
         importAsset,

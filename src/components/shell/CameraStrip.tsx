@@ -9,6 +9,11 @@ import type { CameraId } from '@/engine/sceneRegistry';
 // feels live) plus one other camera round-robin, so all six stay current within a
 // few seconds at a cost of ~1–2 tiny off-screen renders per second.
 const REFRESH_MS = 700;
+// The active camera is rendered at a higher resolution (it's the "live" preview);
+// inactive cameras use a smaller, cheaper capture. Both off-screen, so neither
+// touches the live viewport frame rate.
+const ACTIVE_THUMB_W = 320;
+const INACTIVE_THUMB_W = 192;
 
 export function CameraStrip() {
   const { state, dispatch } = useShell();
@@ -24,8 +29,8 @@ export function CameraStrip() {
     if (!show || !state.engineReady) return;
     let stopped = false;
 
-    const grab = async (id: string) => {
-      const url = await captureCameraThumbnail(id as CameraId, 192);
+    const grab = async (id: string, width: number) => {
+      const url = await captureCameraThumbnail(id as CameraId, width);
       if (url && !stopped) setThumbs((prev) => (prev[id] === url ? prev : { ...prev, [id]: url }));
     };
 
@@ -33,11 +38,12 @@ export function CameraStrip() {
       if (busy.current || document.hidden) return;
       busy.current = true;
       try {
-        // Keep the live (active) camera fresh, then advance the round-robin.
-        await grab(activeId);
+        // Keep the live (active) camera fresh and crisp, then advance the
+        // round-robin over the others at a lighter resolution.
+        await grab(activeId, ACTIVE_THUMB_W);
         const next = CAMERA_SHOTS[rrIndex.current % CAMERA_SHOTS.length].id;
         rrIndex.current += 1;
-        if (next !== activeId) await grab(next);
+        if (next !== activeId) await grab(next, INACTIVE_THUMB_W);
       } finally {
         busy.current = false;
       }
