@@ -16,6 +16,10 @@
     "test:sources": "node tests/source-manager-smoke.mjs",
     "test:visual-smoke": "node tests/browser-visual-smoke.mjs",
     "test:perf-stress": "node tests/perf-stress-smoke.mjs",
+    "test:ar": "node tests/ar-module-smoke.mjs",
+    "test:graphics": "node tests/graphics-module-smoke.mjs",
+    "test:scenes": "node tests/scenes-module-smoke.mjs",
+    "test:module-nav": "node tests/module-nav-smoke.mjs",
     "test:freed": "node --experimental-strip-types tests/freed.test.mjs"
   },
   "dependencies": {
