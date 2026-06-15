@@ -26,6 +26,8 @@ interface TimelineContextValue {
   addCue: (cue: Cue) => void;
   removeCue: (id: string) => void;
   clearCues: () => void;
+  /** Replace all cues (and optionally duration) from a loaded project. */
+  restoreCues: (cues: Cue[], duration?: number) => void;
 }
 
 const TimelineContext = createContext<TimelineContextValue | null>(null);
@@ -58,12 +60,19 @@ export function TimelineProvider({ children }: { children: ReactNode }) {
   const removeCue = useCallback((id: string) => setCues((prev) => prev.filter((c) => c.id !== id)), []);
   const clearCues = useCallback(() => setCues([]), []);
 
+  const restoreCues = useCallback((next: Cue[], dur?: number) => {
+    setCues([...next].sort((a, b) => a.time - b.time));
+    if (typeof dur === 'number' && Number.isFinite(dur)) setDurationState(Math.max(1, dur));
+    setIsPlaying(false);
+    setPlayheadState(0);
+  }, []);
+
   return (
     <TimelineContext.Provider
       value={{
         playhead, duration, isPlaying, loop, fps, cues,
         play, pause, togglePlay, stop, seek, stepBy, setPlayhead,
-        setLoop, setDuration, addCue, removeCue, clearCues,
+        setLoop, setDuration, addCue, removeCue, clearCues, restoreCues,
       }}
     >
       {children}

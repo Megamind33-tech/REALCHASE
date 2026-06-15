@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
 import { useSources } from '@/context/SourcesContext';
 import { useEditorBridge } from '@/context/EditorBridgeContext';
+import { useScenes } from '@/context/ScenesContext';
+import { useGraphics } from '@/context/GraphicsContext';
+import { useAr } from '@/context/ArContext';
+import { useLighting } from '@/context/LightingContext';
+import { useTimeline } from '@/context/TimelineContext';
 import { buildProjectFile, parseProjectFile, saveProjectFile } from '@/projectPersistence';
 
 const DEFAULT_INGEST_URL = 'http://localhost:8889/chase/whip';
@@ -18,6 +23,11 @@ export function TopBar() {
     onAir, canStream, liveLabel, streamError, toggleAir,
   } = useSources();
   const { serializeScene, restoreScene } = useEditorBridge();
+  const { scenes, restoreScenes } = useScenes();
+  const { graphics, restoreGraphics } = useGraphics();
+  const { elements: arElements, restoreAr } = useAr();
+  const { lighting, setLighting } = useLighting();
+  const { cues, duration: timelineDuration, restoreCues } = useTimeline();
   const openRef = useRef<HTMLInputElement>(null);
   const [ingestUrl, setIngestUrl] = useState(DEFAULT_INGEST_URL);
   const { metrics } = state;
@@ -29,7 +39,13 @@ export function TopBar() {
 
   const saveProject = async () => {
     try {
-      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId, serializeScene()));
+      const path = await saveProjectFile(buildProjectFile(state, sources, previewId, programId, serializeScene(), {
+        scenes,
+        graphics,
+        ar: arElements,
+        lighting,
+        timelineCues: { cues, duration: timelineDuration },
+      }));
       dispatch({ type: 'SHOW_TOAST', message: path === 'cancelled' ? 'Save Project cancelled' : `Saved project: ${path}` });
     } catch (error) {
       dispatch({ type: 'SHOW_TOAST', message: `Save Project failed: ${error instanceof Error ? error.message : 'unknown error'}` });
@@ -49,7 +65,19 @@ export function TopBar() {
       const assetNote = total
         ? ` Restored ${ok}/${total} asset${total === 1 ? '' : 's'}${groups ? ` and ${groups} group${groups === 1 ? '' : 's'}` : ''}${missing ? `, ${missing} external file${missing === 1 ? '' : 's'} missing` : ''}.`
         : '';
-      dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}.${assetNote} Live sources need reconnection.` });
+
+      // Restore each optional studio section that the file carried. Missing
+      // sections are skipped silently (older files). AR + graphics come back
+      // off-air — the file never auto-composites into the live Program output.
+      const parts: string[] = [];
+      if (restored.scenes) { restoreScenes(restored.scenes); if (restored.scenes.length) parts.push(`${restored.scenes.length} scene${restored.scenes.length === 1 ? '' : 's'}`); }
+      if (restored.graphics) { restoreGraphics(restored.graphics); if (restored.graphics.length) parts.push(`${restored.graphics.length} graphic${restored.graphics.length === 1 ? '' : 's'} (off-air)`); }
+      if (restored.ar) { restoreAr(restored.ar); if (restored.ar.length) parts.push(`${restored.ar.length} AR element${restored.ar.length === 1 ? '' : 's'} (off-air)`); }
+      if (restored.lighting) { setLighting(restored.lighting); parts.push('lighting'); }
+      if (restored.timelineCues) { restoreCues(restored.timelineCues.cues, restored.timelineCues.duration); if (restored.timelineCues.cues.length) parts.push(`${restored.timelineCues.cues.length} timeline cue${restored.timelineCues.cues.length === 1 ? '' : 's'}`); }
+      const extrasNote = parts.length ? ` Also restored ${parts.join(', ')}.` : '';
+
+      dispatch({ type: 'SHOW_TOAST', message: `Opened project: ${restored.projectName}.${assetNote}${extrasNote} Live sources need reconnection.` });
     } catch (error) {
       dispatch({ type: 'SHOW_TOAST', message: `Open Project failed: ${error instanceof Error ? error.message : 'invalid file'}` });
     }

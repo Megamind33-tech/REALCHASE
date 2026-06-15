@@ -15,6 +15,8 @@ interface ArContextValue {
   patchElement: (id: string, patch: Partial<ArElement>) => void;
   selectElement: (id: string | null) => void;
   setOnAir: (id: string, onAir: boolean) => void;
+  /** Replace all AR elements from a loaded project. Restored elements are off-air. */
+  restoreAr: (elements: ArElement[]) => void;
 }
 
 const ArContext = createContext<ArContextValue | null>(null);
@@ -38,9 +40,15 @@ export function ArProvider({ children }: { children: ReactNode }) {
   const setOnAir = useCallback((id: string, onAir: boolean) => {
     setElements((prev) => prev.map((e) => (e.id === id ? { ...e, onAir } : e)));
   }, []);
+  const restoreAr = useCallback((next: ArElement[]) => {
+    // Force restored elements off-air; a saved file must never auto-composite
+    // AR into the live Program output on load.
+    setElements(next.map((e) => ({ ...e, onAir: false })));
+    setSelectedId(null);
+  }, []);
 
   return (
-    <ArContext.Provider value={{ elements, selectedId, addElement, removeElement, patchElement, selectElement, setOnAir }}>
+    <ArContext.Provider value={{ elements, selectedId, addElement, removeElement, patchElement, selectElement, setOnAir, restoreAr }}>
       {children}
     </ArContext.Provider>
   );
