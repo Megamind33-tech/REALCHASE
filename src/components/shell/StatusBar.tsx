@@ -1,12 +1,31 @@
+import { useEffect, useState } from 'react';
+import { HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useShell } from '@/context/ShellContext';
+import { HelpOverlay } from '@/components/shell/HelpOverlay';
 
 export function StatusBar() {
   const { state, dispatch } = useShell();
   const { metrics } = state;
   const warn = state.performanceWarning && !state.performanceWarningDismissed;
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // "?" or F1 toggles the Help overlay; ignored while typing in a field so it
+  // never eats a literal "?" in a text input.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '?' && e.key !== 'F1') return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      e.preventDefault();
+      setHelpOpen((prev) => !prev);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
+    <>
     <footer
       style={{
         height: 'var(--statusbar-h)',
@@ -51,7 +70,18 @@ export function StatusBar() {
         ) : (
           <Button variant="ghost" style={{ height: 18, fontSize: 9, gap: 4 }} disabled title="Live chat requires a streaming/output service">Live Chat · Not wired</Button>
         )}
+        <Button
+          variant="secondary"
+          style={{ height: 18, fontSize: 9, gap: 4 }}
+          onClick={() => setHelpOpen(true)}
+          title="Help & keyboard shortcuts (?)"
+          aria-label="Help and keyboard shortcuts"
+        >
+          <HelpCircle size={11} /> ?
+        </Button>
       </span>
     </footer>
+    <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   );
 }
