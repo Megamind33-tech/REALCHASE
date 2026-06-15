@@ -1,19 +1,22 @@
 # CHASE STUDIO PRO — Next Work Queue & Milestone Breakdown
 
 **Planning Period:** June 14 – December 31, 2026  
-## Resume Point (2026-06-14)
+## Resume Point (2026-06-15)
 
 - **Branch:** `chase/fork-audit`
-- **Milestones complete:** M1 (audit) · M2 (source manager) · M3 (scenes) · M4 (graphics) · M5 (timeline) · M6 (lighting/materials) · M7 (output preview + recording) · **M8 (fork wiring audit)**.
+- **Milestones complete:** M1 (audit) · M2 (source manager) · M3 (scenes) · M4 (graphics) · M5 (timeline) · M6 (lighting/materials) · M7 (output preview + recording) · M8 (fork wiring audit) · **M9 (performance and stress evidence)**.
 - **M2 backport:** COMPLETE at `729cc78`; real webcam, video file, image, and screen source paths are wired to Preview/Program and the Babylon scene.
 - **M7:** Composite output preview, recording telemetry, WebM, capability-gated native H.264/MP4. ProRes honestly unavailable (needs native ffmpeg bridge).
 - **M8 (this pass):** Verified all 11 forks against real code — 2 ACTIVE (npm Babylon + editor-tools), 2 EXTERNAL (MediaMTX + gstreamer via relay/ffmpeg), 7 REFERENCE-ONLY. No GPL code linked. `@babylonjs/materials` retained deliberately for editor-tools `.babylon` pack loading (documented, not pruned). See `FORKS_AUDIT.md` → "Milestone 8 — Fork Wiring Verification" and enriched `FORKS_MANIFEST.json` (`wiringStatus`/`verifiedUsage`).
-- **Verification (this pass):** `tsc -b` clean; anti-demo smoke passes.
-- **Known blocker:** Production `vite build` exceeded 304.5s without output on the OneDrive workstation (builds ~2.5–3 min in CI/Linux). Do not report the production bundle as passing on that workstation until resolved.
+- **M9:** Playwright stress coverage and `docs/PERFORMANCE_REPORT.md` are committed at `13ceeab`; the captured software-WebGL run remained stable with flat heap use and no page or console errors.
+- **Verification:** `tsc -b`, anti-demo smoke, source-manager smoke, FreeD regression, in-app browser UI smoke, production Vite build, optimized Tauri release build, and Windows launch smoke pass.
+- **Windows artifact:** NSIS x64 installer built successfully at `src-tauri/target/release/bundle/nsis/CHASE Studio Pro_0.1.0_x64-setup.exe` (SHA-256 `B77826B345A882D45F39A2F9B2BF447297252E9F1D5919150C677DB377E88E85`).
+- **Packaging inputs:** `src-tauri/Cargo.lock` and the generated Tauri icon set are committed so clean worktrees can reproduce the Windows installer.
+- **Known release gap:** The installer is not code-signed yet; Windows may show an unknown-publisher warning.
 - **Post-milestone hardening (done since M8):** revived all 6 placeholder module screens into real workspaces; asset/group delete (button + Delete key); graphic font selection; headset WebXR *preview* (relabelled — not broadcast AR); **real Web Audio mixer** (per-source fader/mute/solo + master into the recorded/streamed bus).
 - **DONE — Broadcast AR (Zero Density-style):** world-anchored AR elements (card/3D-text/box/sphere/cylinder) in a new **AR module**, toggled on-air into the Program composite, locked to the set under FreeD tracking (no headset). Engine `upsertArElement`/`removeArElement`; `ArContext` + `ArSync` persist/replay.
 - **DONE — AR floor anchoring + data templates:** "Anchor to studio floor" grounds elements (base on y=0) with a contact ring; AR Data Cards have Plain/Stat/Score Bug/Live Clock templates with editable fields; the Live Clock card redraws every second on air. Future: snap to a tracked floor plane from the camera feed, and external data feeds (live scores/stats).
-- **Then:** M9 (performance & stress testing), M10 (final polish). Outstanding patch: native Tauri/ffmpeg ProRes bridge.
+- **Next:** M10 final polish, native Tauri/ffmpeg ProRes bridge, code signing, and a signed-installer desktop recording rehearsal.
 
 **Target Delivery:** Production-ready virtual broadcasting studio  
 **Approach:** Milestone-based; each completes a distinct value delivery
